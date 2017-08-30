@@ -68,38 +68,38 @@ public:
 
     inline const MyPendulum& getMyPendulum() const;
 
-    /*virtual*/MyPendulumGuts* cloneImpl() const {return new MyPendulumGuts(*this);}
+    /*virtual*/MyPendulumGuts* cloneImpl() const override {return new MyPendulumGuts(*this);}
 
         /////////////////////////////////////////////////////////
         // Implementation of continuous DynamicSystem virtuals //
         /////////////////////////////////////////////////////////
 
-    int realizeTopologyImpl(State&) const OVERRIDE_11;
-    int realizeModelImpl(State&) const OVERRIDE_11;
-    int realizeInstanceImpl(const State&) const OVERRIDE_11;
-    int realizePositionImpl(const State&) const OVERRIDE_11;
-    int realizeVelocityImpl(const State&) const OVERRIDE_11;
-    int realizeDynamicsImpl(const State&) const OVERRIDE_11;
-    int realizeAccelerationImpl(const State&) const OVERRIDE_11;
+    int realizeTopologyImpl(State&) const override;
+    int realizeModelImpl(State&) const override;
+    int realizeInstanceImpl(const State&) const override;
+    int realizePositionImpl(const State&) const override;
+    int realizeVelocityImpl(const State&) const override;
+    int realizeDynamicsImpl(const State&) const override;
+    int realizeAccelerationImpl(const State&) const override;
 
     // qdot==u here so these are just copies
     void multiplyByNImpl(const State& state, const Vector& u, 
-                         Vector& dq) const OVERRIDE_11 {dq=u;}
+                         Vector& dq) const override {dq=u;}
     void multiplyByNTransposeImpl(const State& state, const Vector& fq, 
-                                  Vector& fu) const OVERRIDE_11 {fu=fq;}
+                                  Vector& fu) const override {fu=fq;}
     void multiplyByNPInvImpl(const State& state, const Vector& dq, 
-                             Vector& u) const OVERRIDE_11 {u=dq;}
+                             Vector& u) const override {u=dq;}
     void multiplyByNPInvTransposeImpl(const State& state, const Vector& fu, 
-                                      Vector& fq) const OVERRIDE_11 {fq=fu;}
+                                      Vector& fq) const override {fq=fu;}
 
     // No prescribed motion.
-    bool prescribeQImpl(State&) const OVERRIDE_11 {return false;}
-    bool prescribeUImpl(State&) const OVERRIDE_11 {return false;}
+    bool prescribeQImpl(State&) const override {return false;}
+    bool prescribeUImpl(State&) const override {return false;}
 
     void projectQImpl(State&, Vector& qErrEst, 
-             const ProjectOptions& options, ProjectResults& results) const OVERRIDE_11;
+             const ProjectOptions& options, ProjectResults& results) const override;
     void projectUImpl(State&, Vector& uErrEst, 
-             const ProjectOptions& options, ProjectResults& results) const OVERRIDE_11;
+             const ProjectOptions& options, ProjectResults& results) const override;
 
 
         ////////////////////////////////////////////////
@@ -107,7 +107,7 @@ public:
         ////////////////////////////////////////////////
 
     int calcEventTriggerInfoImpl
-       (const State& s, Array_<EventTriggerInfo>& eti) const OVERRIDE_11 
+       (const State& s, Array_<EventTriggerInfo>& eti) const override 
     {
         eti.clear();
         eti.push_back(EventTriggerInfo(eventId0)
@@ -121,13 +121,16 @@ public:
 
     int calcTimeOfNextScheduledEventImpl
        (const State& s, Real& tNextEvent, 
-        Array_<EventId>& eventIds, bool includeCurrentTime) const OVERRIDE_11
+        Array_<EventId>& eventIds, bool includeCurrentTime) const override
     {
         // Generate an event every 5.123 seconds.
         int nFives = (int)(s.getTime() / 5.123); // rounded down
-        tNextEvent = (nFives+1) * Real(5.123);
+        if (s.getTime()==0) nFives=1; // don't start with the event
+
+        tNextEvent = nFives * Real(5.123);
         // Careful ...
-        if (tNextEvent <= s.getTime())
+        if (   tNextEvent < s.getTime() 
+            || (tNextEvent == s.getTime() && !includeCurrentTime))
             tNextEvent += Real(5.123);
         eventIds.push_back(eventId1); // event Id for scheduled pulse
 
@@ -143,7 +146,7 @@ public:
     void handleEventsImpl
        (State& s, Event::Cause cause, const Array_<EventId>& eventIds,
         const HandleEventsOptions& options, HandleEventsResults& results) const 
-        OVERRIDE_11
+        override
     {
         cout << "===> t=" << s.getTime() << ": HANDLING " 
              << Event::getCauseName(cause) << " EVENT!!!" << endl;
@@ -304,19 +307,24 @@ int main () {
     integ.initialize(sys.getDefaultState());
 
     cout << "ACCURACY IN USE = " << integ.getAccuracyInUse() << endl;
+    cout << "Initial y=" << integ.getState().getY() << endl;
+    cout << "Initial ydot=" << integ.getState().getYDot() << endl;
 
-
+    Real prevScheduledEventTime = -Infinity;
     for (int reportNo=0; !integ.isSimulationOver(); 
          reportNo += (integ.getTime() >= reportNo*hReport))
     {
         Array_<EventId> scheduledEventIds;
         Real nextScheduledEvent = NTraits<Real>::getInfinity();
         sys.calcTimeOfNextScheduledEvent(integ.getAdvancedState(), 
-            nextScheduledEvent, scheduledEventIds, true);
+            nextScheduledEvent, scheduledEventIds, 
+            integ.getAdvancedTime() > prevScheduledEventTime);
 
         HandleEventsOptions handleOpts(integ.getAccuracyInUse());
         HandleEventsResults handleResults;
 
+        printf("----------------------------------------------------------\n");
+        printf("stepTo(%g,%g)\n", reportNo*hReport, nextScheduledEvent);
         switch(integ.stepTo(reportNo*hReport, nextScheduledEvent)) {
             case Integrator::ReachedStepLimit: printf("STEP LIMIT\n"); break;
             case Integrator::ReachedReportTime: printf("REPORT TIME AT t=%.17g\n", integ.getTime()); break;
@@ -334,6 +342,7 @@ int main () {
                     handleResults.getExitStatus()==HandleEventsResults::ShouldTerminate;
                 lowestModified = handleResults.getLowestModifiedStage();
                 integ.reinitialize(lowestModified, shouldTerminate);
+                prevScheduledEventTime = integ.getAdvancedTime();
                 break;
             }
 
@@ -450,11 +459,11 @@ static void printFinalStats(const Integrator& integ)
   printf("\nFinal Statistics:\n");
   printf("h0u = %g\n",h0u);
   printf("nst = %-6d nattempt = %-6d nfe  = %-6d nsetups = %-6d\n",
-	 nst, nattempt, nfe, nsetups);
+     nst, nattempt, nfe, nsetups);
   printf("nfeLS = %-6d nje = %d\n",
-	 nfeLS, nje);
+     nfeLS, nje);
   printf("nni = %-6d ncfn = %-6d netf = %-6d \n",
-	 nni, ncfn, netf);
+     nni, ncfn, netf);
   printf("nproj = %-6d nprojq = %-6d nproju = %-6d\n",
          nproj, nprojq, nproju);
   printf("nprf = %-6d nprqf = %-6d npruf = %-6d\n",
@@ -575,7 +584,8 @@ int MyPendulumGuts::realizeDynamicsImpl(const State& s) const {
     const Real m  = getMyPendulum().getMass(s);
     const Real g  = getMyPendulum().getGravity(s);
 
-    Real& mg = Value<Real>::downcast(s.updCacheEntry(subsysIndex, mgForceIndex)).upd();
+    Real& mg = Value<Real>::updDowncast
+                            (s.updCacheEntry(subsysIndex, mgForceIndex)).upd();
     // Calculate the force due to gravity.
     mg = m*g;
     System::Guts::realizeDynamicsImpl(s);
@@ -586,7 +596,7 @@ int MyPendulumGuts::realizeAccelerationImpl(const State& s) const {
     const Real m  = getMyPendulum().getMass(s);
     const Real g  = getMyPendulum().getGravity(s);
     // we're pretending we couldn't calculate this here!
-    const Real mg = Value<Real>::downcast
+    const Real mg = Value<Real>::updDowncast
                        (s.updCacheEntry(subsysIndex, mgForceIndex)).get();
 
     const Vector& q    = s.getQ(subsysIndex);

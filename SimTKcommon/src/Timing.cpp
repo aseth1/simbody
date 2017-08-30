@@ -24,8 +24,8 @@
 /** @file
  * Defines any routines that have to be supplied to implement the features
  * promised in Timing.h. Currently this consists of faking up the
- * Posix timing routines when using the Microsoft Visual Studio C/C++ 
- * compiler cl on Windows, or when running on Mac OSX.
+ * Posix timing routines when using the Microsoft Visual Studio C/C++
+ * compiler cl on Windows, or when running on Mac OSX 10.11 or older.
  */
 
 
@@ -48,42 +48,49 @@
     #define WIN32_LEAN_AND_MEAN
     #define NOMINMAX
     #include <Windows.h>
-#elif defined(__APPLE__)
+#elif SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME 
     #include <unistd.h>
     #include <sys/time.h>
     #include <mach/mach.h>
     #include <mach/mach_time.h>
 #endif
 
-// There are a billion (1e9) nanoseconds in a second.
-static const long long NsPerSec = 1000000000LL;
+// These local symbols are not needed on all platforms. Define them just
+// when needed to avoid "unused variable" warnings.
+#if defined(_MSC_VER) || SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME
+    // There are a billion (1e9) nanoseconds in a second.
+    static const long long NsPerSec = 1000000000LL;
+#endif
 
-// There are a million (1e6) nanoseconds in a millisecond.
-static const long long NsPerMs = 1000000LL;
-
-// There are a thousand (1e3) nanoseconds in a microsecond.
-static const long long NsPerUs = 1000LL;
-
-// There are 10 million (1e7) 100ns (hecto ns) ticks in a second.
-static const long long HectoNsPerSec = 10000000LL;
-
-// There are a million (1e6) microseconds in a second.
-static const long long UsPerSec = 1000000LL;
-
-// static getnstimeofday()
-// -----------------------
-// Returns the time of day in seconds and nanoseconds since 1-1-1970.
-// This is derived from code by Rolf Steenge, posted at 
-// https://projects.coin-or.org/Cbc/ticket/45.
-// This method is the guts of CLOCK_REALTIME.
 #if defined(_MSC_VER)
+    // There are a million (1e6) nanoseconds in a millisecond.
+    static const long long NsPerMs = 1000000LL;
+
+    // There are a thousand (1e3) nanoseconds in a microsecond.
+    static const long long NsPerUs = 1000LL;
+
+    // There are 10 million (1e7) 100ns (hecto ns) ticks in a second.
+    static const long long HectoNsPerSec = 10000000LL;
+
+    // There are a million (1e6) microseconds in a second.
+    static const long long UsPerSec = 1000000LL;
+
     // This is the time interval from the Win32 epoch 1/1/1601 to
     // the Unix epoch 1/1/1970, measured in 100ns (hecto ns) ticks.
     // The number of days between those dates (measuring them both
     // using the same calendar) is 134774=(369 years)*365 + 89 leap days,
     // or 11644473600 seconds (=134774*24*3600).
     static const long long FILETIME_1970 = 11644473600LL*HectoNsPerSec;
+#endif
 
+// static getnstimeofday()
+// -----------------------
+// Returns the time of day in seconds and nanoseconds since 1-1-1970.
+// This is derived from code by Rolf Steenge, posted at
+// https://projects.coin-or.org/Cbc/ticket/45.
+// This method is the guts of CLOCK_REALTIME.
+
+#if defined(_MSC_VER)
     // Return the value of a FILETIME reinterpreted as a
     // long long integer count of the number of 100ns ("hecto ns")
     // ticks since start of 1/1/1601 UTC.
@@ -101,14 +108,14 @@ static const long long UsPerSec = 1000000LL;
     // same interval changed to seconds and nanoseconds in a timespec struct.
     static inline void
     hectoNsToTimespec(const long long& hecto, struct timespec& ts) {
-        ts.tv_sec  = (long)  (hecto / HectoNsPerSec);	        // seconds
+        ts.tv_sec  = (long)  (hecto / HectoNsPerSec);            // seconds
         ts.tv_nsec = (long) ((hecto % HectoNsPerSec) * 100LL); // nanoseconds
     }
 
     // Given time reported as a Win32 FILETIME measured from 1/1/1601, convert
     // it to a timespec measured from 1/1/1970.
     // CAUTION: note shift of epoch (measurement base) here.
-    static inline void filetimeToTimespec(const FILETIME& ft, 
+    static inline void filetimeToTimespec(const FILETIME& ft,
                                           struct timespec& ts) {
         long long hecto = filetimeToHectoNs(ft);
         hectoNsToTimespec(hecto - FILETIME_1970, ts);
@@ -117,11 +124,11 @@ static const long long UsPerSec = 1000000LL;
     static int getnstimeofday(struct timespec *tp) {
         if (!tp) return 0;
         FILETIME ft;
-        GetSystemTimeAsFileTime(&ft);	 // 100-nanoseconds since 1-1-1601
+        GetSystemTimeAsFileTime(&ft);     // 100-nanoseconds since 1-1-1601
         filetimeToTimespec(ft, *tp);     // now in ns since 1-1-1970
         return 0;
     }
-#elif defined(__APPLE__)
+#elif SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME 
     static int getnstimeofday(struct timespec *tp) {
         if (!tp) return 0;
         struct timeval tod;
@@ -134,9 +141,9 @@ static const long long UsPerSec = 1000000LL;
 
 // static getperformancecounter()
 // ------------------------------
-// This is the guts of CLOCK_MONOTONIC (all variants). This is the number of 
-// seconds and nanoseconds since an arbitrary start time, with a very high 
-// resolution. This is for measuring short intervals very accurately; long 
+// This is the guts of CLOCK_MONOTONIC (all variants). This is the number of
+// seconds and nanoseconds since an arbitrary start time, with a very high
+// resolution. This is for measuring short intervals very accurately; long
 // term it might drift away from the real time clock.
 #if defined(_MSC_VER)
     static int getperformancecounter(struct timespec *tp) {
@@ -152,30 +159,30 @@ static const long long UsPerSec = 1000000LL;
         }
 
         LARGE_INTEGER ticks;
-        if(!QueryPerformanceCounter(&ticks)) 
+        if(!QueryPerformanceCounter(&ticks))
             return EINVAL; // bad news
 
-        // Careful: don't try to simplify or rearrange these expressions; 
+        // Careful: don't try to simplify or rearrange these expressions;
         // we're depending on integer arithmetic done in long long precision.
         tp->tv_sec = (long) (ticks.QuadPart / ticksPerSec);
         tp->tv_nsec =(long)((ticks.QuadPart % ticksPerSec)*NsPerSec / ticksPerSec);
 
         return 0;
     }
-#elif defined(__APPLE__)
+#elif SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME 
     static int getperformancecounter(struct timespec *tp) {
         if (!tp) return 0;
-  
-        static mach_timebase_info_data_t info = {0,0};   
-  
-        if (info.denom == 0)   
-                mach_timebase_info(&info);   
+
+        static mach_timebase_info_data_t info = {0,0};
+
+        if (info.denom == 0)
+                mach_timebase_info(&info);
 
         unsigned long long ticks = mach_absolute_time();
-        unsigned long long ticksInNs = (ticks * info.numer) / info.denom;   
-  
-        tp->tv_sec  = (time_t)(ticksInNs / NsPerSec);   
-        tp->tv_nsec = (long)(ticksInNs % NsPerSec);  
+        unsigned long long ticksInNs = (ticks * info.numer) / info.denom;
+
+        tp->tv_sec  = (time_t)(ticksInNs / NsPerSec);
+        tp->tv_nsec = (long)(ticksInNs % NsPerSec);
 
         return 0;
     }
@@ -190,7 +197,7 @@ static const long long UsPerSec = 1000000LL;
     static int getprocesscputime(struct timespec* tp) {
         if (!tp) return 0;
 
-        FILETIME creationTime, exitTime, kernelTime, userTime; 
+        FILETIME creationTime, exitTime, kernelTime, userTime;
         if (!GetProcessTimes(GetCurrentProcess(),
             &creationTime, &exitTime,
             &kernelTime, &userTime))
@@ -201,7 +208,7 @@ static const long long UsPerSec = 1000000LL;
         hectoNsToTimespec(ktime+utime, *tp);
         return 0;
     }
-#elif defined(__APPLE__)
+#elif SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME 
     static int getprocesscputime(struct timespec* tp) {
         if (!tp) return 0;
 
@@ -237,13 +244,13 @@ static const long long UsPerSec = 1000000LL;
 // static getthreadcputime()
 // -------------------------
 // This is the guts of CLOCK_THREAD_CPUTIME_ID. It returns the number of
-// seconds and nanoseconds of cpu time used by the currently executing 
+// seconds and nanoseconds of cpu time used by the currently executing
 // thread since it started.
 #if defined(_MSC_VER)
     static int getthreadcputime(struct timespec* tp) {
         if (!tp) return 0;
 
-        FILETIME creationTime, exitTime, kernelTime, userTime; 
+        FILETIME creationTime, exitTime, kernelTime, userTime;
         if (!GetThreadTimes(GetCurrentThread(),
             &creationTime, &exitTime,
             &kernelTime, &userTime))
@@ -254,7 +261,7 @@ static const long long UsPerSec = 1000000LL;
         hectoNsToTimespec(ktime+utime, *tp);
         return 0;
     }
-#elif defined(__APPLE__)
+#elif SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME 
     static int getthreadcputime(struct timespec* tp) {
         if (!tp) return 0;
 
@@ -284,7 +291,7 @@ static const long long UsPerSec = 1000000LL;
 // int clock_gettime()
 // -------------------
 // Now define the Posix clock_gettime() function in terms of the above helpers.
-#if defined(_MSC_VER) || defined(__APPLE__)
+#if defined(_MSC_VER) || SimTK_IS_APPLE_AND_MUST_DEFINE_CLOCK_GETTIME 
     int clock_gettime (clockid_t clock_id, struct timespec *tp) {
         int retval = EINVAL;
 
@@ -294,7 +301,11 @@ static const long long UsPerSec = 1000000LL;
             retval = getnstimeofday(tp);
             break;
         case CLOCK_MONOTONIC:
-        case CLOCK_MONOTONIC_HR:  // "high resolution"
+        #ifdef CLOCK_MONOTONIC_HR
+        case CLOCK_MONOTONIC_HR:  // "high resolution"; not defined on macOS if
+                                  // using SDK MacOSX10.12.sdk or greater with
+                                  // deployment target 10.11 or lower.
+        #endif
         case CLOCK_MONOTONIC_RAW: // "not subject to NTP adjustments"
             retval = getperformancecounter(tp);
             break;

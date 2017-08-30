@@ -152,7 +152,7 @@ namespace Ipopt
 
     // Call the optimization algorithm to solve the restoration phase
     // problem
-    SolverReturn resto_status	= resto_alg_->Optimize();
+    SolverReturn resto_status    = resto_alg_->Optimize();
 
     int retval=-1;
 
@@ -230,7 +230,7 @@ namespace Ipopt
         THROW_EXCEPTION(FEASIBILITY_PROBLEM_SOLVED, "Restoration phase converged to sufficiently feasible point of original square problem.");
       }
 
-      // Update the bound multiplers, pretending that the entire
+      // Update the bound multipliers, pretending that the entire
       // progress in x and s in the restoration phase has been one
       // [rimal-dual Newton step (and therefore the result of solving
       // an augmented system)

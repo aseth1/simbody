@@ -569,11 +569,11 @@ bool AbstractIntegratorRep::takeOneStep(Real tMax, Real tReport)
                                          : true);
         if (!stepSucceeded)
             statsErrorTestFailures++;
-	    else { // step succeeded
-	        lastStepSize = t1-t0;
-	        if (isNaN(actualInitialStepSizeTaken))
+        else { // step succeeded
+            lastStepSize = t1-t0;
+            if (isNaN(actualInitialStepSizeTaken))
                     actualInitialStepSizeTaken = lastStepSize;
-	    }
+        }
     } while (!stepSucceeded);
     
     // The step succeeded. Check for event triggers. If there aren't any, we're
@@ -659,7 +659,7 @@ bool AbstractIntegratorRep::takeOneStep(Real tMax, Real tReport)
 
     // There is an event in (tLow,tHigh], with the eariest occurrence
     // estimated at tMid=earliestTimeEst, tLow<tMid<tHigh. 
-    // Decide whether the earliest occurence is actually in the
+    // Decide whether the earliest occurrence is actually in the
     // (tLow,tMid] interval or (tMid,tHigh].
 
     // Remember which side of the interval the root estimate was in over

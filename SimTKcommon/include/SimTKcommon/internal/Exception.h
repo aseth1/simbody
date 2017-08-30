@@ -9,7 +9,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2005-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2005-15 Stanford University and the Authors.        *
  * Authors: Michael Sherman                                                   *
  * Contributors:                                                              *
  *                                                                            *
@@ -24,11 +24,6 @@
  * limitations under the License.                                             *
  * -------------------------------------------------------------------------- */
 
-// Keeps MS VC++ 8 quiet about sprintf, strcpy, etc.
-#ifdef _MSC_VER
-#pragma warning(disable:4996)
-#endif
-
 #include "SimTKcommon/internal/common.h"
 
 #include <string>
@@ -40,27 +35,33 @@
 namespace SimTK {
 
 namespace Exception {
-	
-// SimTK::Exception::Base	
+
+    // Keeps MS VC++ quiet about sprintf, strcpy, etc.
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4996)
+#endif
+    
+// SimTK::Exception::Base    
 class Base : public std::exception {
 public:
-	explicit Base(const char* fn="<UNKNOWN>", int ln=0) 
+    explicit Base(const char* fn="<UNKNOWN>", int ln=0) 
       : fileName(fn), lineNo(ln) { } 
-	virtual ~Base() throw() { }
-	const std::string& getMessage()     const { return msg; }
+    virtual ~Base() throw() { }
+    const std::string& getMessage()     const { return msg; }
     const std::string& getMessageText() const { return text; }
 
     // override virtual function from std::exception
-    const char* what() const throw() {return getMessage().c_str();}
+    const char* what() const throw() override {return getMessage().c_str();}
 protected:
-	void setMessage(const std::string& msgin) {
+    void setMessage(const std::string& msgin) {
         text = msgin;
         msg = "SimTK Exception thrown at " + where() + ":\n  " + msgin;
     }
 private:
-	std::string	fileName;	// where the exception was thrown
-	int		    lineNo;	
-	std::string	msg;		// a message formatted for display by catcher
+    std::string    fileName;    // where the exception was thrown
+    int            lineNo;    
+    std::string    msg;        // a message formatted for display by catcher
     std::string text;      // the original passed-in text
     
     static std::string shortenFileName(const std::string& fn) 
@@ -68,8 +69,8 @@ private:
         if (pos+1>=fn.size()) pos=0;
         return std::string(fn,(int)(pos+1),(int)(fn.size()-(pos+1)));
     }
-	
-	std::string where() const {
+    
+    std::string where() const {
         char buf[32];
         sprintf(buf,"%d",lineNo);
         return shortenFileName(fileName) + ":" + std::string(buf); 
@@ -236,11 +237,11 @@ class UnimplementedMethod : public Base {
 public:
     UnimplementedMethod(const char* fn, int ln, std::string methodName) 
     :   Base(fn,ln)
-	{ 
-	    setMessage("The method " + methodName
+    { 
+        setMessage("The method " + methodName
             + "is not yet implemented. Please post to the Simbody forum"
               " to find a workaround or request implementation.");
-	}
+    }
     virtual ~UnimplementedMethod() throw() { }
 };
 
@@ -248,12 +249,12 @@ class UnimplementedVirtualMethod : public Base {
 public:
     UnimplementedVirtualMethod(const char* fn, int ln, 
         std::string baseClass, std::string methodName) 
-		: Base(fn,ln)
-	{ 
-		setMessage("The base class " + baseClass + 
+        : Base(fn,ln)
+    { 
+        setMessage("The base class " + baseClass + 
             " dummy implementation of method " + methodName
             + "() was invoked because a derived class did not provide an implementation.");
-	}
+    }
     virtual ~UnimplementedVirtualMethod() throw() { }
 };
 
@@ -296,12 +297,16 @@ public:
 // SimTK::Exception::Cant
 class Cant : public Base {
 public:
-	Cant(const char* fn, int ln, const std::string& s) : Base(fn,ln)
-	{
-		setMessage("Can't perform operation: " + s);
-	}	
+    Cant(const char* fn, int ln, const std::string& s) : Base(fn,ln)
+    {
+        setMessage("Can't perform operation: " + s);
+    }    
     virtual ~Cant() throw() { }
 };
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 } // namespace Exception
 } // namespace SimTK

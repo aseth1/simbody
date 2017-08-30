@@ -30,6 +30,10 @@
 #include <iostream> 
 #include <cmath>
 
+#ifdef _MSC_VER
+#pragma warning(disable:4996) // don't warn about strcat, sprintf, etc.
+#endif
+
 #define NUMBER_OF_CORRECTIONS 5   
 
 #if SimTK_DEFAULT_PRECISION==1 // float
@@ -533,9 +537,9 @@ void SimTK::LBFGSOptimizer::lbfgs_
                  x, f, gradient, &stp, &converged);
 
     }  // end while loop
-	delete [] diag;
-	delete [] gradient;
-	delete [] w;
+    delete [] diag;
+    delete [] gradient;
+    delete [] w;
 
 /*     ------------------------------------------------------------ */
 /*     END OF MAIN ITERATION LOOP.  */

@@ -9,7 +9,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2005-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2005-15 Stanford University and the Authors.        *
  * Authors: Michael Sherman                                                   *
  * Contributors:                                                              *
  *                                                                            *
@@ -24,12 +24,6 @@
  * limitations under the License.                                             *
  * -------------------------------------------------------------------------- */
 
-// Keeps MS VC++ 8 quiet about sprintf, strcpy, etc.
-#ifdef _MSC_VER
-#pragma warning(disable:4996)
-#endif
-
-
 #include "SimTKcommon/internal/common.h"
 #include "SimTKcommon/internal/ExceptionMacros.h"
 
@@ -39,11 +33,17 @@
 #include <complex>
 #include <sstream>
 
+// Keeps MS VC++ quiet about sprintf, strcpy, etc.
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4996)
+#endif
+
 namespace SimTK {
 
 template <class N> class negator;
 template <class R> class conjugate;
-	
+    
 /** SimTK::String is a plug-compatible std::string replacement (plus some
 additional functionality) intended to be suitable for passing through the 
 SimTK API without introducing binary compatibility problems the way 
@@ -76,7 +76,7 @@ explicit String(char c) {push_back(c);}
 /** This is an implicit conversion from std::string to String **/
 String(const std::string& s) : std::string(s) { }
 
-/** Construct a String as a copy of a substring begining at position \a start 
+/** Construct a String as a copy of a substring beginning at position \a start 
 with length \a len. **/
 String(const String& s, int start, int len) : std::string(s,start,len) { }
 
@@ -110,7 +110,7 @@ inconvenient unsigned type size_type. **/
 int length() const {return (int)std::string::length();}
 
 /** @name             Formatted output constructors
-These contructors format the supplied argument into a human-readable %String,
+These constructors format the supplied argument into a human-readable %String,
 using a default or caller-supplied printf-like format. By default, maximum 
 precision is used for floating point values, and user-friendly strings are 
 used for bool (true or false) and non-finite floating point values (NaN, 
@@ -136,33 +136,39 @@ explicit String(unsigned long long s, const char* fmt="%llu")
 {   char buf[64]; sprintf(buf,fmt,s); (*this)=buf; }
 
 /** Format a float as a printable %String. Nonfinite values are formatted as
-NaN, Inf, or -Inf as appropriate (Matlab compatible). **/
-SimTK_SimTKCOMMON_EXPORT explicit String(float r, const char* fmt="%.7g");
+NaN, Inf, or -Inf as appropriate (Matlab compatible). The default format
+specification includes enough digits so that the identical value will be
+recovered if the string is converted back to float. **/
+SimTK_SimTKCOMMON_EXPORT explicit String(float r, const char* fmt="%.9g");
 
 /** Format a double as a printable %String. Nonfinite values are formatted as
-NaN, Inf, or -Inf as appropriate (Matlab compatible). **/
-SimTK_SimTKCOMMON_EXPORT explicit String(double r, const char* fmt="%.15g");
+NaN, Inf, or -Inf as appropriate (Matlab compatible). The default format
+specification includes enough digits so that the identical value will be
+recovered if the string is converted back to double. **/
+SimTK_SimTKCOMMON_EXPORT explicit String(double r, const char* fmt="%.17g");
 
-/** Format a long double as a printable %String. Nonfinite values are 
-formatted as NaN, Inf, or -Inf as appropriate (Matlab compatible). **/
+/** Format a long double as a printable %String. Nonfinite values are formatted 
+as NaN, Inf, or -Inf as appropriate (Matlab compatible). The default format
+specification includes enough digits so that the identical value will be
+recovered if the string is converted back to long double. **/
 SimTK_SimTKCOMMON_EXPORT explicit String(long double r, 
-                                         const char* fmt="%.20Lg");
+                                         const char* fmt="%.21Lg");
 
 /** Format a complex\<float> as a printable %String (real,imag) with parentheses
 and a comma as shown. The format string should be for a single float and will 
 be used twice; the default format is the same as for float. **/
-explicit String(std::complex<float> r, const char* fmt="%.7g")
+explicit String(std::complex<float> r, const char* fmt="%.9g")
 {   (*this)="(" + String(r.real(),fmt) + "," + String(r.imag(),fmt) + ")"; }
 /** Format a complex\<double> as a printable %String (real,imag) with 
 parentheses and a comma as shown. The format string should be for a single 
 double and will be used twice; the default format is the same as for double. **/
-explicit String(std::complex<double> r, const char* fmt="%.15g")	
+explicit String(std::complex<double> r, const char* fmt="%.17g")    
 {   (*this)="(" + String(r.real(),fmt) + "," + String(r.imag(),fmt) + ")"; }
 /** Format a complex\<long double> as a printable %String (real,imag) with 
 parentheses and a comma as shown. The format string should be for a single long
 double and will be used twice; the default format is the same as for long
 double. **/
-explicit String(std::complex<long double> r, const char* fmt="%.20Lg")	
+explicit String(std::complex<long double> r, const char* fmt="%.21Lg")    
 {   (*this)="(" + String(r.real(),fmt) + "," + String(r.imag(),fmt) + ")"; }
 
 /** Format a bool as a printable %String "true" or "false"; if you want "1"
@@ -323,19 +329,60 @@ String& replaceAllChar(const std::string& in, char oldChar, char newChar)
 {   return String(in).replaceAllChar(oldChar, newChar); }
 /*@}*/
 
-};	
+};    
 
 // All std::stream activity should be dealt with inline so that we don't have
 // to worry about binary compatibility issues that can arise when passing 
 // streams through the API.
 
-/** Generic templatized %String constructor uses T::operator<<() to generate
-the %String when no specialization is available. **/ 
+/** @cond **/ // Hide from Doxygen
+template <class T> inline
+auto stringStreamInsertHelper(std::ostringstream& os, const T& t, bool)
+    -> decltype(static_cast<std::ostringstream&>(os << t)) {
+    os << t;
+    return os;
+}
+
+
+template <class T> inline
+auto stringStreamInsertHelper(std::ostringstream& os, const T& t, int)
+                                                    -> std::ostringstream& {
+    SimTK_ERRCHK1_ALWAYS(!"no stream insertion operator", "String::String(T)", 
+        "Type T=%s has no stream insertion operator<<(T) and there "
+        "is no specialized String(T) constructor.", 
+        NiceTypeName<T>::namestr().c_str());
+    return os;
+}
+
+template <class T> inline
+auto stringStreamExtractHelper(std::istringstream& is, T& t, bool)
+    -> decltype(static_cast<std::istringstream&>(is >> t)) {
+    is >> t;
+    return is;
+}
+
+template <class T> inline
+auto stringStreamExtractHelper(std::istringstream& is, T& t, int)
+                                                    -> std::istringstream& {
+    SimTK_ERRCHK1_ALWAYS(!"no stream extraction operator", 
+        "String::tryConvertTo<T>()", 
+        "Type T=%s has no stream extraction operator>>(T) and there "
+        "is no specialized tryConvertTo<T>() constructor.", 
+        NiceTypeName<T>::namestr().c_str());
+    return is;
+}
+
+/** @endcond **/
+
+/** Generic templatized %String constructor uses stream insertion 
+`operator<<(T)` to generate the %String when no specialization of this
+constructor is available. A *runtime* error is thrown if this method is
+invoked and neither a specialization nor stream insertion operator is 
+available. **/ 
 template <class T> inline
 String::String(const T& t) {
-    std::ostringstream stream;
-    stream << t;
-    *this = stream.str();
+    std::ostringstream os;
+    *this = stringStreamInsertHelper(os, t, true).str();
 }
 
 
@@ -345,8 +392,9 @@ String::String(const T& t) {
 // specializing this helper function instead.
 template <class T> inline static
 bool tryConvertStringTo(const String& value, T& out) {
-	std::istringstream sstream(value);
-	sstream >> out; if (sstream.fail()) return false;
+    std::istringstream sstream(value);
+    stringStreamExtractHelper(sstream, out, true);
+    if (sstream.fail()) return false;
     if (sstream.eof()) return true;
     // Successful conversion but didn't use all the characters. Maybe the
     // rest is just whitespace?
@@ -413,7 +461,7 @@ template<class T> inline static
 bool tryConvertStringTo(const String& value, T*& out) {
     SimTK_ERRCHK1_ALWAYS(false, "SimTK::convertStringTo(value,T*)",
         "Can't interpret a string as a pointer (%s*).",
-        NiceTypeName<T>::name());
+        NiceTypeName<T>::namestr().c_str());
     return false; 
 }
 
@@ -433,7 +481,7 @@ String::convertTo(T& out) const {
     if (shorter.size() < this->size()) shorter += " ...";
     SimTK_ERRCHK2_ALWAYS(convertOK, "String::convertTo()",
         "Couldn't interpret string '%s' as type T=%s.",
-        shorter.c_str(), NiceTypeName<T>::name());
+        shorter.c_str(), NiceTypeName<T>::namestr().c_str());
 }
 
 /** This method converts its String argument to type T and returns it into
@@ -465,5 +513,10 @@ template <class T> inline static
 T convertStringTo(const String& in)
 {   return in.convertTo<T>(); }
 
-}
+} // namespace SimTK
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #endif // SimTK_SimTKCOMMON_STRING_H_

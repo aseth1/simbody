@@ -150,10 +150,10 @@ Note that handles always consist of exactly one pointer, and handle classes
 are always concrete (meaning they have no virtual methods). **/
 class SimTK_SimTKCOMMON_EXPORT AbstractMeasure {
 protected:
-	/// An object of this type is used as a dummy argument to make sure the 
+    /// An object of this type is used as a dummy argument to make sure the 
     /// automatically-generated handle constructor's signature doesn't conflict 
     /// with an explicitly-defined one.
-	class SetHandle {};
+    class SetHandle {};
 
 public:
     class Implementation; // local; name is AbstractMeasure::Implementation
@@ -1062,7 +1062,7 @@ public:
     /// The time stamp will be taken from the supplied State.
     void setValue(State& s, const T& value) const;
 
-    /// Force this Measure to sample its input at the current time.
+    /// %Force this Measure to sample its input at the current time.
     void sample(State& s) const;
 
     const Measure_<T>& getSource() const;

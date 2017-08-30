@@ -9,9 +9,9 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2005-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2005-15 Stanford University and the Authors.        *
  * Authors: Michael Sherman                                                   *
- * Contributors:                                                              *
+ * Contributors: Chris Dembia                                                 *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
  * not use this file except in compliance with the License. You may obtain a  *
@@ -122,23 +122,23 @@ or any other Index type to an argument expecting a certain Index type. **/
     #if defined(__cplusplus)
         #include <cstdio>
         #define SimTK_DEBUG(s) std::printf("DBG: " s)
-        #define SimTK_DEBUG1(s,a1) std::printf("DBG: " s,a1)	
-        #define SimTK_DEBUG2(s,a1,a2) std::printf("DBG: " s,a1,a2)	
-        #define SimTK_DEBUG3(s,a1,a2,a3) std::printf("DBG: " s,a1,a2,a3)	
+        #define SimTK_DEBUG1(s,a1) std::printf("DBG: " s,a1)    
+        #define SimTK_DEBUG2(s,a1,a2) std::printf("DBG: " s,a1,a2)    
+        #define SimTK_DEBUG3(s,a1,a2,a3) std::printf("DBG: " s,a1,a2,a3)    
         #define SimTK_DEBUG4(s,a1,a2,a3,a4) std::printf("DBG: " s,a1,a2,a3,a4)
     #else
         #include <stdio.h>
         #define SimTK_DEBUG(s) printf("DBG: " s)
-        #define SimTK_DEBUG1(s,a1) printf("DBG: " s,a1)	
-        #define SimTK_DEBUG2(s,a1,a2) printf("DBG: " s,a1,a2)	
-        #define SimTK_DEBUG3(s,a1,a2,a3) printf("DBG: " s,a1,a2,a3)	
+        #define SimTK_DEBUG1(s,a1) printf("DBG: " s,a1)    
+        #define SimTK_DEBUG2(s,a1,a2) printf("DBG: " s,a1,a2)    
+        #define SimTK_DEBUG3(s,a1,a2,a3) printf("DBG: " s,a1,a2,a3)    
         #define SimTK_DEBUG4(s,a1,a2,a3,a4) printf("DBG: " s,a1,a2,a3,a4)
     #endif
 #else
     #define SimTK_DEBUG(s)
     #define SimTK_DEBUG1(s,a1)
     #define SimTK_DEBUG2(s,a1,a2)
-    #define SimTK_DEBUG3(s,a1,a2,a3)	
+    #define SimTK_DEBUG3(s,a1,a2,a3)    
     #define SimTK_DEBUG4(s,a1,a2,a3,a4)
 #endif
 
@@ -168,35 +168,57 @@ or any other Index type to an argument expecting a certain Index type. **/
     #pragma warning(disable:4251) /*no DLL interface for type of member of exported class*/
     #pragma warning(disable:4275) /*no DLL interface for base class of exported class*/
     #pragma warning(disable:4345) /*warning about PODs being default-initialized*/
+
+
+    /* Until VS2015 struct timespec was missing from <ctime> so is faked here 
+    if needed. However, note that it is also defined in the pthread.h header on 
+    Windows, so the guard symbol must match here to avoid a duplicate declaration. 
+    TODO: there is a potential problem here since VS2015's struct timespec 
+    doesn't appear to match pthread's definition. */
+    #ifndef HAVE_STRUCT_TIMESPEC
+    #define HAVE_STRUCT_TIMESPEC 1
+        #if _MSC_VER < 1900
+        struct timespec {
+            long tv_sec; /*TODO: should be time_t but must fix in pthreads too*/
+            long tv_nsec;
+        };
+        #endif
+    #endif /* HAVE_STRUCT_TIMESPEC */
     #endif
     #if defined(SimTK_SimTKCOMMON_BUILDING_SHARED_LIBRARY)
+        #ifdef _MSC_VER
         #define SimTK_SimTKCOMMON_EXPORT __declspec(dllexport)
         /* Keep MS VC++ quiet when it tries to instantiate incomplete template classes in a DLL. */
-        #ifdef _MSC_VER
         #pragma warning(disable:4661)
+        #else
+        #define SimTK_SimTKCOMMON_EXPORT
         #endif
     #elif defined(SimTK_SimTKCOMMON_BUILDING_STATIC_LIBRARY) || defined(SimTK_USE_STATIC_LIBRARIES)
         #define SimTK_SimTKCOMMON_EXPORT
     #else
+        #ifdef _MSC_VER
         #define SimTK_SimTKCOMMON_EXPORT __declspec(dllimport) /*i.e., a client of a shared library*/
+        #else
+        #define SimTK_SimTKCOMMON_EXPORT
+        #endif
     #endif
-	/* VC++ tries to be secure by leaving bounds checking on for STL containers
-	 * even in Release mode. This macro exists to disable that feature and can
-	 * result in a considerable speedup.
-	 * CAUTION: every linked-together compilation unit must have this set the same
-	 * way. Everyone who properly includes this file first is fine; but as of this
-	 * writing Simmath's IpOpt doesn't do so.
+    /* VC++ tries to be secure by leaving bounds checking on for STL containers
+     * even in Release mode. This macro exists to disable that feature and can
+     * result in a considerable speedup.
+     * CAUTION: every linked-together compilation unit must have this set the same
+     * way. Everyone who properly includes this file first is fine; but as of this
+     * writing Simmath's IpOpt doesn't do so.
      * NOTE: Microsoft corrected this problem with VC10 -- the feature is 
      * disabled by default in that compiler and later.
      */
-	/* (sherm 081204 disabling for now: doesn't work on VC++ 8 and is 
-	 * tricky on VC++ 9 because all libraries, including 3rd party, must
-	 * be built the same way). Better to use the SimTK::Array_<T> class in
+    /* (sherm 081204 disabling for now: doesn't work on VC++ 8 and is 
+     * tricky on VC++ 9 because all libraries, including 3rd party, must
+     * be built the same way). Better to use the SimTK::Array_<T> class in
      * place of the std::vector<T> class to get better performance.
-	 #ifdef NDEBUG
-	 	#undef _SECURE_SCL
-	 	#define _SECURE_SCL 0
-	 #endif
+     #ifdef NDEBUG
+         #undef _SECURE_SCL
+         #define _SECURE_SCL 0
+     #endif
      */
 #else
     #define SimTK_SimTKCOMMON_EXPORT // Linux, Mac
@@ -229,6 +251,7 @@ extern "C" {
 
 #include <cstddef>
 #include <cassert>
+#include <cstring>
 #include <cmath>
 #include <cfloat>
 #include <complex>
@@ -236,47 +259,43 @@ extern "C" {
 #include <typeinfo>
 #include <algorithm>
 
-/* Transition macros for C++11 support. VC10 and VC11 have partial support for
-C++11, early VC's do not. Currently we're assuming no support from gcc. */
+/* Be very careful with this macro -- don't use it unless you have measured
+a performance improvement. You can end up with serious code bloat if you 
+override the compiler's judgement about when to inline, and that can cause
+cache misses which ultimately reduce performance. */
+#ifdef _MSC_VER
+    #define SimTK_FORCE_INLINE __forceinline
+#else
+    #define SimTK_FORCE_INLINE __attribute__((always_inline)) inline
+#endif
+
+/* Microsoft added noexcept in VS2015 */
+#if defined(_MSC_VER) && _MSC_VER < 1900
+    #define NOEXCEPT_11 throw()
+#else
+    #define NOEXCEPT_11 noexcept
+#endif
+
+/* C++14 introduces a standard way to mark deprecated declarations. Before
+that we can use non-standard compiler hacks. */
 #ifndef SWIG
-    #if _MSC_VER>=1700 /* VC11 or higher */
-        #define OVERRIDE_11  override
-        #define FINAL_11     final
-    #elif _MSC_VER==1600 /* VC10 */
-        #define OVERRIDE_11  override
-        #define FINAL_11     sealed
-    #else /* gcc or earlier VC */
-        #define OVERRIDE_11
-        #define FINAL_11
+    #if __cplusplus >= 201402L
+        /* C++14 */
+        #define DEPRECATED_14(MSG) [[deprecated(MSG)]]
+    #elif _MSC_VER
+        /* VC++ just says warning C4996 so add "DEPRECATED" to the message. */
+        #define DEPRECATED_14(MSG) __declspec(deprecated("DEPRECATED: " MSG))
+    #else /* gcc or clang */
+        #define DEPRECATED_14(MSG) __attribute__((deprecated(MSG)))
     #endif
 #else /* Swigging */
-    #define OVERRIDE_11
-    #define FINAL_11
+    #define DEPRECATED_14(MSG)
 #endif
 
-
-/* In Microsoft VC++ 11 (2012) and earlier these C99-compatible floating 
-point functions are missing. We'll create them here and install them into 
-namespace std. They were added in VC++ 12 (2013). */
-#if defined(_MSC_VER) && (_MSC_VER <= 1700) // VC++ 12 (2013, _MSC_VER=1800) added these
-namespace std {
-inline bool isfinite(float f) {return _finite(f) != 0;}
-inline bool isfinite(double d) {return _finite(d) != 0;}
-inline bool isfinite(long double l) {return _finite(l) != 0;}
-inline bool isnan(float f) {return _isnan(f) != 0;}
-inline bool isnan(double d) {return _isnan(d) != 0;}
-inline bool isnan(long double l) {return _isnan(l) != 0;}
-inline bool isinf(float f) {return std::abs(f)==std::numeric_limits<float>::infinity();}
-inline bool isinf(double d) {return std::abs(d)==std::numeric_limits<double>::infinity();}
-inline bool isinf(long double l) {return std::abs(l)==std::numeric_limits<double>::infinity();}
-inline bool signbit(float f) {return (*reinterpret_cast<unsigned*>(&f) & 0x80000000U) != 0;}
-inline bool signbit(double d) {return (*reinterpret_cast<unsigned long long*>(&d)
-                                & 0x8000000000000000ULL) != 0;}
-inline bool signbit(long double l) {return (*reinterpret_cast<unsigned long long*>(&l)
-                                    & 0x8000000000000000ULL) != 0;}
-}
-#endif
-
+/* These macros are deprecated, leftover from before C++11 was available. 
+Don't use them. Sorry, can't use the DEPRECATED_14 macro here! */
+#define OVERRIDE_11 override
+#define FINAL_11 final
 
 namespace SimTK {
 
@@ -380,7 +399,7 @@ static const int InvalidIndex = -1111111111;
  * the value -1 if that is produced by a subtraction operation acting on a 
  * previously-valid Index, since that can occur during loops which are 
  * processed from the end towards the beginning. -1 is then allowed in 
- * comparision operators but not in any other operations, including further 
+ * comparison operators but not in any other operations, including further 
  * decrementing.
  *
  * No namespace is assumed for the newly-defined type; if you want the 
@@ -427,50 +446,65 @@ public:                                     \
     NAME() : ix(SimTK::InvalidIndex) { }       \
     explicit NAME(int i) : ix(i)      {assert(i>=0 || i==SimTK::InvalidIndex);} \
     explicit NAME(long l): ix((int)l) {assert(SimTK::canStoreInNonnegativeInt(l));}    \
+    explicit NAME(long long l): ix((int)l) {assert(SimTK::canStoreInNonnegativeInt(l));}    \
     explicit NAME(unsigned int  u)  : ix((int)u)  {assert(SimTK::canStoreInInt(u));}   \
     explicit NAME(unsigned long ul) : ix((int)ul) {assert(SimTK::canStoreInInt(ul));}  \
+    explicit NAME(unsigned long long ul) : ix((int)ul) {assert(SimTK::canStoreInInt(ul));}  \
     operator int() const {return ix;}               \
     bool isValid() const {return ix>=0;}            \
     bool isValidExtended() const {return ix>=-1;}   \
-    void invalidate(){ix=SimTK::InvalidIndex;}      \
+    void invalidate(){clear();}                     \
+    void clear(){ix=SimTK::InvalidIndex;}           \
     \
     bool operator==(int  i) const {assert(isValidExtended() && isValidExtended(i)); return ix==i;}    \
     bool operator==(short s) const{assert(isValidExtended() && isValidExtended(s)); return ix==(int)s;}  \
     bool operator==(long l) const {assert(isValidExtended() && isValidExtended(l)); return ix==(int)l;}  \
+    bool operator==(long long l) const {assert(isValidExtended() && isValidExtended(l)); return ix==(int)l;}  \
     bool operator==(unsigned int  u)  const {assert(isValidExtended() && isValid(u)); return ix==(int)u;}   \
     bool operator==(unsigned short us)const {assert(isValidExtended() && isValid(us)); return ix==(int)us;} \
     bool operator==(unsigned long ul) const {assert(isValidExtended() && isValid(ul)); return ix==(int)ul;} \
+    bool operator==(unsigned long long ul) const {assert(isValidExtended() && isValid(ul)); return ix==(int)ul;} \
     bool operator!=(int  i)           const {return !operator==(i);}    \
     bool operator!=(short s)          const {return !operator==(s);}    \
     bool operator!=(long l)           const {return !operator==(l);}    \
+    bool operator!=(long long l)      const {return !operator==(l);}    \
     bool operator!=(unsigned int  u)  const {return !operator==(u);}    \
     bool operator!=(unsigned long ul) const {return !operator==(ul);}   \
+    bool operator!=(unsigned long long ul) const {return !operator==(ul);}   \
     \
     bool operator< (int  i) const {assert(isValidExtended() && isValidExtended(i)); return ix<i;}        \
     bool operator< (short s) const{assert(isValidExtended() && isValidExtended(s)); return ix<(int)s;}   \
     bool operator< (long l) const {assert(isValidExtended() && isValidExtended(l)); return ix<(int)l;}   \
+    bool operator< (long long l) const {assert(isValidExtended() && isValidExtended(l)); return ix<(int)l;}   \
     bool operator< (unsigned int  u)  const {assert(isValidExtended() && isValid(u));  return ix<(int)u;}    \
     bool operator< (unsigned short us)const {assert(isValidExtended() && isValid(us)); return ix<(int)us;}   \
     bool operator< (unsigned long ul) const {assert(isValidExtended() && isValid(ul)); return ix<(int)ul;}   \
+    bool operator< (unsigned long long ul) const {assert(isValidExtended() && isValid(ul)); return ix<(int)ul;}   \
     bool operator>=(int  i)           const {return !operator<(i);}    \
     bool operator>=(short s)          const {return !operator<(s);}    \
     bool operator>=(long l)           const {return !operator<(l);}    \
+    bool operator>=(long long l)           const {return !operator<(l);}    \
     bool operator>=(unsigned int  u)  const {return !operator<(u);}    \
     bool operator>=(unsigned short us)const {return !operator<(us);}   \
     bool operator>=(unsigned long ul) const {return !operator<(ul);}   \
+    bool operator>=(unsigned long long ul) const {return !operator<(ul);}   \
     \
     bool operator> (int  i) const {assert(isValidExtended() && isValidExtended(i)); return ix>i;}        \
     bool operator> (short s) const{assert(isValidExtended() && isValidExtended(s)); return ix>(int)s;}   \
     bool operator> (long l) const {assert(isValidExtended() && isValidExtended(l)); return ix>(int)l;}   \
+    bool operator> (long long l) const {assert(isValidExtended() && isValidExtended(l)); return ix>(int)l;}   \
     bool operator> (unsigned int  u)  const {assert(isValidExtended() && isValid(u));  return ix>(int)u;}    \
     bool operator> (unsigned short us)const {assert(isValidExtended() && isValid(us)); return ix>(int)us;}   \
     bool operator> (unsigned long ul) const {assert(isValidExtended() && isValid(ul)); return ix>(int)ul;}   \
+    bool operator> (unsigned long long ul) const {assert(isValidExtended() && isValid(ul)); return ix>(int)ul;}   \
     bool operator<=(int  i)           const {return !operator>(i);}    \
     bool operator<=(short s)          const {return !operator>(s);}    \
     bool operator<=(long l)           const {return !operator>(l);}    \
+    bool operator<=(long long l)      const {return !operator>(l);}    \
     bool operator<=(unsigned int  u)  const {return !operator>(u);}    \
     bool operator<=(unsigned short us)const {return !operator>(us);}   \
     bool operator<=(unsigned long ul) const {return !operator>(ul);}   \
+    bool operator<=(unsigned long long ul) const {return !operator>(ul);}   \
     \
     const NAME& operator++() {assert(isValid()); ++ix; return *this;}       /*prefix */   \
     NAME operator++(int)     {assert(isValid()); ++ix; return NAME(ix-1);}  /*postfix*/   \
@@ -485,23 +519,30 @@ public:                                     \
     NAME& operator-=(short s){assert(isValid() && SimTK::canStoreInInt(s) && isValidExtended(ix-(int)s)); ix-=(int)s; return *this;}     \
     NAME& operator+=(long l) {assert(isValid() && SimTK::canStoreInInt(l) && isValidExtended(ix+(int)l)); ix+=(int)l; return *this;}     \
     NAME& operator-=(long l) {assert(isValid() && SimTK::canStoreInInt(l) && isValidExtended(ix-(int)l)); ix-=(int)l; return *this;}     \
+    NAME& operator+=(long long l) {assert(isValid() && SimTK::canStoreInInt(l) && isValidExtended(ix+(int)l)); ix+=(int)l; return *this;}     \
+    NAME& operator-=(long long l) {assert(isValid() && SimTK::canStoreInInt(l) && isValidExtended(ix-(int)l)); ix-=(int)l; return *this;}     \
     NAME& operator+=(unsigned int  u)  {assert(isValid()&& SimTK::canStoreInInt(u)  && isValid(ix+(int)u));  ix+=(int)u;  return *this;}  \
     NAME& operator-=(unsigned int  u)  {assert(isValid()&& SimTK::canStoreInInt(u)  && isValidExtended(ix-(int)u));  ix-=(int)u;  return *this;}  \
     NAME& operator+=(unsigned short us){assert(isValid()&& SimTK::canStoreInInt(us) && isValid(ix+(int)us)); ix+=(int)us; return *this;}  \
     NAME& operator-=(unsigned short us){assert(isValid()&& SimTK::canStoreInInt(us) && isValidExtended(ix-(int)us)); ix-=(int)us; return *this;}  \
     NAME& operator+=(unsigned long ul) {assert(isValid()&& SimTK::canStoreInInt(ul) && isValid(ix+(int)ul)); ix+=(int)ul; return *this;}  \
     NAME& operator-=(unsigned long ul) {assert(isValid()&& SimTK::canStoreInInt(ul) && isValidExtended(ix-(int)ul)); ix-=(int)ul; return *this;}  \
+    NAME& operator+=(unsigned long long ul) {assert(isValid()&& SimTK::canStoreInInt(ul) && isValid(ix+(int)ul)); ix+=(int)ul; return *this;}  \
+    NAME& operator-=(unsigned long long ul) {assert(isValid()&& SimTK::canStoreInInt(ul) && isValidExtended(ix-(int)ul)); ix-=(int)ul; return *this;}  \
     \
     static const NAME& Invalid() {static const NAME invalid; return invalid;}       \
     static bool isValid(int  i) {return i>=0;}                                      \
     static bool isValid(short s){return s>=0;}                                      \
     static bool isValid(long l) {return SimTK::canStoreInNonnegativeInt(l);}        \
+    static bool isValid(long long l) {return SimTK::canStoreInNonnegativeInt(l);}        \
     static bool isValid(unsigned int  u)  {return SimTK::canStoreInInt(u);}         \
     static bool isValid(unsigned short)   {return true;}                            \
     static bool isValid(unsigned long ul) {return SimTK::canStoreInInt(ul);}        \
+    static bool isValid(unsigned long long ul) {return SimTK::canStoreInInt(ul);}        \
     static bool isValidExtended(int  i) {return i>=-1;}                             \
     static bool isValidExtended(short s){return s>=-1;}                             \
     static bool isValidExtended(long l) {return SimTK::canStoreInInt(l) && l>=-1;}  \
+    static bool isValidExtended(long long l) {return SimTK::canStoreInInt(l) && l>=-1;}  \
     /* IndexTraits for use in Array_<T,X> with this as X; same as int */            \
     typedef int size_type;                                                  \
     typedef int difference_type;                                            \
@@ -529,8 +570,8 @@ type. **/
     static const Derived& downcast(const Parent& p)             \
         { return SimTK_DYNAMIC_CAST_DEBUG<const Derived&>(p); } \
     static Derived& updDowncast(Parent& p)                      \
-        { return SimTK_DYNAMIC_CAST_DEBUG<Derived&>(p); }	    \
-	static Derived& downcast(Parent& p)                         \
+        { return SimTK_DYNAMIC_CAST_DEBUG<Derived&>(p); }        \
+    static Derived& downcast(Parent& p)                         \
         { return SimTK_DYNAMIC_CAST_DEBUG<Derived&>(p); }
 
 /** This is like SimTK_DOWNCAST except it allows for an intermediate "helper" 
@@ -540,9 +581,9 @@ class between Derived and Parent. **/
         { return Helper::isA(p); }                                      \
     static const Derived& downcast(const Parent& p)                     \
         { return static_cast<const Derived&>(Helper::downcast(p)); }    \
-    static Derived& updDowncast(Parent& p)							    \
-        { return static_cast<Derived&>(Helper::downcast(p)); }		    \
-	static Derived& downcast(Parent& p)                                 \
+    static Derived& updDowncast(Parent& p)                                \
+        { return static_cast<Derived&>(Helper::downcast(p)); }            \
+    static Derived& downcast(Parent& p)                                 \
         { return static_cast<Derived&>(Helper::downcast(p)); }
 
 
@@ -569,7 +610,7 @@ typedef std::complex<Real>      Complex;
 /** An abbreviation for std::complex<float> for consistency with others. **/
 typedef std::complex<float>     fComplex;
 /** An abbreviation for std::complex<double> for consistency with others. **/
-typedef std::complex<float>     dComplex;
+typedef std::complex<double>    dComplex;
 
 
 // Forward declaration giving template defaults must come before any
@@ -590,6 +631,35 @@ struct Segment {
     int length;
     int offset;
 };  
+
+// These next four methods supply the missing relational operators for any
+// types L and R where L==R and L<R have been defined. This is like the
+// operators in the std::rel_ops namespace, except that those require both
+// types to be the same.
+
+template<class L, class R> inline
+bool operator!=(const L& left, const R& right)
+{   // test for inequality, in terms of equality
+    return !(left == right);
+}
+
+template<class L, class R> inline
+bool operator>(const L& left, const R& right)
+{   // test if left > right, in terms of operator<
+    return right < left;
+}
+
+template<class L, class R> inline
+bool operator<=(const L& left, const R& right)
+{   // test if left <= right, in terms of operator<
+    return !(right < left);
+}
+
+template<class L, class R> inline
+bool operator>=(const L& left, const R& right)
+{   // test if left >= right, in terms of operator<
+    return !(left < right);
+}
 
 
 /** This is a special type used for causing invocation of a particular
@@ -718,24 +788,118 @@ template<> struct Is64BitHelper<false>
 platform, meaning that the size of a pointer is the same as the size of a 
 long long; otherwise it will be FalseType and we have a 32-bit platform meaning
 that the size of a pointer is the same as an int. **/
-static const bool Is64BitPlatform = sizeof(size_t) > sizeof(int);
+// We use a constexpr function to avoid a bug in SWIG.
+constexpr bool detect64BitPlatform() { return (sizeof(size_t) > sizeof(int)); }
+static const bool Is64BitPlatform = detect64BitPlatform();
 typedef Is64BitHelper<Is64BitPlatform>::Result Is64BitPlatformType;
 
 
-/** In case you don't like the name you get from typeid(), you can specialize
-this class to provide a nicer name. This is typically used for error messages 
-and testing. **/
+/** Attempt to demangle a type name as returned by typeid.name(), with the
+result hopefully suitable for meaningful display to a human. Behavior is 
+compiler-dependent. 
+@relates SimTK::NiceTypeName **/
+SimTK_SimTKCOMMON_EXPORT 
+std::string demangle(const char* name);
+
+/** Given a compiler-dependent demangled type name string as returned by 
+SimTK::demangle(), attempt to form a canonicalized representation that will be
+the same for any compiler. Unnecessary spaces and superfluous keywords like
+"class" and "struct" are removed. The `namestr()` method of NiceTypeName\<T>
+uses this function to produce a human-friendly type name that is the same on any
+platform. The input argument is left empty. 
+@relates SimTK::NiceTypeName **/
+SimTK_SimTKCOMMON_EXPORT 
+std::string canonicalizeTypeName(std::string&& demangledTypeName);
+
+/** Same, but takes an lvalue reference so has to copy the input. 
+@relates SimTK::NiceTypeName **/
+inline std::string canonicalizeTypeName(const std::string& demangledTypeName)
+{   return canonicalizeTypeName(std::string(demangledTypeName)); }
+
+/** Given a canonicalized type name, produce a modified version that is 
+better-suited to use as an XML attribute. This means replacing the angle
+brackets with curly braces to avoid trouble. The input argument is left
+empty. 
+@relates SimTK::NiceTypeName **/
+SimTK_SimTKCOMMON_EXPORT
+std::string encodeTypeNameForXML(std::string&& canonicalizedTypeName);
+
+/** Same, but takes an lvalue reference so has to copy the input. 
+@relates SimTK::NiceTypeName **/
+inline std::string encodeTypeNameForXML(const std::string& niceTypeName)
+{   return encodeTypeNameForXML(std::string(niceTypeName)); }
+
+/** Given a type name that was encoded for XML by SimTK::encodeTypeNameForXML(),
+restore it to its canonicalized form. This means replacing curly braces by
+angle brackets. The input argument is left empty. 
+@relates SimTK::NiceTypeName **/
+SimTK_SimTKCOMMON_EXPORT
+std::string decodeXMLTypeName(std::string&& xmlTypeName);
+
+/** Same, but takes an lvalue reference so has to copy the input. 
+@relates SimTK::NiceTypeName **/
+inline std::string decodeXMLTypeName(const std::string& xmlTypeName)
+{   return decodeXMLTypeName(std::string(xmlTypeName)); }
+
+/** Obtain human-readable and XML-usable names for arbitrarily-complicated
+C++ types. Three methods `name()`, `namestr()`, and `xmlstr()` are provided
+giving respectively the compiler-dependent output from `typeid(T).%name()`, 
+a canonicalized human-readable string, and the canonicalized string with
+XML-forbidden angle brackets replaced by curly braces. The default 
+implementation is usable for most types, but if you don't like the result you 
+can specialize to provide nicer names. For example, you may prefer SimTK::Vec3 
+to SimTK::Vec\<3,double,1>.
+
+@warning Don't expect usable names for types that are defined in an anonymous 
+namespace or for function-local types. Names will still be produced but they 
+won't be unique and won't necessarily be compiler-independent.
+
+The output of `namestr()` is typically used for error messages and testing;
+`xmlstr()` is used for type tags in XML for use in deserializing. **/
 template <class T> struct NiceTypeName {
+    /** The default implementation of name() here returns the raw result from
+    `typeid(T).%name()` which will be fast but may be a mangled name in some 
+    compilers (gcc and clang included). **/
     static const char* name() {return typeid(T).name();}
+    /** The default implementation of namestr() attempts to return a nicely
+    demangled and canonicalized type name on all platforms, using the 
+    SimTK::demangle() and SimTK::canonicalizeTypeName() methods. This is an
+    expensive operation but is only done once. **/
+    static const std::string& namestr() {
+        static const std::string canonical = 
+            canonicalizeTypeName(demangle(name()));
+        return canonical;
+    }
+    /** The default implementation of xmlstr() takes the output of namestr()
+    and invokes SimTK::encodeTypeNameForXML() on it. **/
+    static const std::string& xmlstr() {
+        static const std::string xml = encodeTypeNameForXML(namestr());
+        return xml;
+    }
 };
+
+} // namespace SimTK
 
 /** This specializes the name of a type to be exactly the text you use to
 specify it, rather than whatever ugly thing might result on different platforms
-from resolution of typedefs, default template arguments, etc. **/
-#define SimTK_NICETYPENAME_LITERAL(T)           \
-template <> struct NiceTypeName< T > {          \
-    static const char* name() { return #T; }    \
-};
+from resolution of typedefs, default template arguments, etc. Note that this
+macro generates a template specialization that must be done in the SimTK
+namespace; consequently it opens and closes namespace SimTK and must not
+be invoked if you already have that namespace open. **/
+#define SimTK_NICETYPENAME_LITERAL(T)                                   \
+namespace SimTK {                                                       \
+template <> struct NiceTypeName< T > {                                  \
+    static const char* name() { return #T; }                            \
+    static const std::string& namestr() {                               \
+        static const std::string str(#T);                               \
+        return str;                                                     \
+    }                                                                   \
+    static const std::string& xmlstr() {                                \
+        static const std::string xml = encodeTypeNameForXML(namestr()); \
+        return xml;                                                     \
+    }                                                                   \
+};                                                                      \
+}
 
 // Some types for which we'd like to see nice type names.
 SimTK_NICETYPENAME_LITERAL(bool);            
@@ -763,7 +927,6 @@ SimTK_NICETYPENAME_LITERAL(std::complex<long double>);
 SimTK_NICETYPENAME_LITERAL(SimTK::FalseType);
 SimTK_NICETYPENAME_LITERAL(SimTK::TrueType); 
 
-} // namespace SimTK
 
 #endif /* C++ stuff */
 

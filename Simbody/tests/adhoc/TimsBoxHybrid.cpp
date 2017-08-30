@@ -341,7 +341,7 @@ public:
     // This is called during realize(Dynamics).
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, 
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) const
-                   OVERRIDE_11
+                   override
     {
         const MyHybridContactInfo& info = getContactInfo(state);
         if (info.h >= 0) 
@@ -353,7 +353,7 @@ public:
     }
 
     // The normal force stores energy as 2/5 k h^(5/2) when h<0.
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11 {
+    Real calcPotentialEnergy(const State& state) const override {
         const MyHybridContactInfo& info = getContactInfo(state);
         if (info.h >= 0) 
             return 0; // no contact
@@ -363,7 +363,7 @@ public:
     }
 
     // Allocate state variable for storing the previous sliding direction.
-    void realizeTopology(State& state) const OVERRIDE_11 {
+    void realizeTopology(State& state) const override {
         // The previous sliding direction is used in an event witness that 
         // is evaluated at Velocity stage.
         m_prevSlipDirIx = m_forces.allocateAutoUpdateDiscreteVariable
@@ -377,7 +377,7 @@ public:
 
     // Calculate everything here and save in contact info cache entry where
     // it can be retrieved for generating forces, reporting, etc.
-    void realizeVelocity(const State& state) const OVERRIDE_11 {
+    void realizeVelocity(const State& state) const override {
         MyHybridContactInfo& info = updContactInfo(state);
 
         // Forces generated only if h<0. Cp always be the projection of the
@@ -443,7 +443,7 @@ public:
     // If we're sliding, set the update value for the previous slip direction
     // if the current slip velocity is usable.
     #ifndef USE_CONTINUOUS_STICTION
-    void realizeAcceleration(const State& state) const OVERRIDE_11 {
+    void realizeAcceleration(const State& state) const override {
         const MyHybridContactInfo& info = getContactInfo(state);
         const Vec2& prevSlipDir = getPrevSlipDir(state);
 
@@ -806,7 +806,7 @@ public:
     int getNumSavedStates() const {return (int)m_states.size();}
     const State& getState(int n) const {return m_states[n];}
 
-    void handleEvent(const State& s) const {
+    void handleEvent(const State& s) const override {
         const SimbodyMatterSubsystem& matter=m_mbs.getMatterSubsystem();
         const SpatialVec PG = matter.calcSystemMomentumAboutGroundOrigin(s);
         m_mbs.realize(s, Stage::Acceleration);
@@ -835,7 +835,7 @@ public:
     explicit Nada(Real reportInterval)
     :   PeriodicEventReporter(reportInterval) {} 
 
-    void handleEvent(const State& s) const {
+    void handleEvent(const State& s) const override {
 #ifndef NDEBUG
         printf("%7g NADA\n", s.getTime());
 #endif
@@ -854,7 +854,7 @@ public:
     :   m_unis(unis) {}
 
     void generateDecorations(const State&                state, 
-                             Array_<DecorativeGeometry>& geometry) OVERRIDE_11
+                             Array_<DecorativeGeometry>& geometry) override
     {
         for (int i=0; i < m_unis.getNumContactElements(); ++i) {
             const MyHybridVertexContactElementImpl& contact = 
@@ -885,30 +885,6 @@ private:
 
 
 //==============================================================================
-//                            BODY WATCHER
-//==============================================================================
-// Prior to rendering each frame, point the camera at the given body's
-// origin.
-class BodyWatcher : public Visualizer::FrameController {
-public:
-    explicit BodyWatcher(const MobilizedBody& body) : m_body(body) {}
-
-    void generateControls(const Visualizer&             viz, 
-                          const State&                  state, 
-                          Array_< DecorativeGeometry >& geometry) OVERRIDE_11
-    {
-        const Vec3 Bo = m_body.getBodyOriginLocation(state);
-        const Vec3 p_GC = Bo + Vec3(0, 1, 5); // above and back
-        const Rotation R_GC(UnitVec3(0,1,0), YAxis,
-                            p_GC-Bo, ZAxis);
-        viz.setCameraTransform(Transform(R_GC,p_GC));
-        //viz.pointCameraAt(Bo, Vec3(0,1,0));
-    }
-private:
-    const MobilizedBody m_body;
-};
-
-//==============================================================================
 //                          STICTION ON HANDLER
 //==============================================================================
 // Allocate one of these for each contact constraint that has friction. This 
@@ -927,7 +903,7 @@ public:
 
     // This is the witness function. It is positive as long as we continue
     // to slide in the same direction; negative means reversal.
-    Real getValue(const State& state) const {
+    Real getValue(const State& state) const override {
         const MyHybridVertexContactElementImpl& contact = 
             m_unis.getContactElement(m_which);
         if (!contact.isInContact(state)) return 0;
@@ -936,7 +912,7 @@ public:
     }
 
     void handleEvent
-       (State& s, Real accuracy, bool& shouldTerminate) const 
+       (State& s, Real accuracy, bool& shouldTerminate) const override 
     {
     ++m_counter;
     //printf("StictionOn #%d\n", m_counter);
@@ -991,7 +967,7 @@ public:
 
     // This is the witness function. It is positive as long as mu_s*N is greater
     // than the friction force magnitude.
-    Real getValue(const State& state) const {
+    Real getValue(const State& state) const override {
         const MyHybridVertexContactElementImpl& contact = 
             m_unis.getContactElement(m_which);
         if (!contact.isInContact(state)) return 0;
@@ -1000,7 +976,7 @@ public:
     }
 
     void handleEvent
-       (State& s, Real accuracy, bool& shouldTerminate) const 
+       (State& s, Real accuracy, bool& shouldTerminate) const override 
     {
     ++m_counter;
     //printf("StictionOff #%d\n", m_counter);
@@ -1057,7 +1033,7 @@ public:
     //                       Custom force virtuals
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, 
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) const
-                   OVERRIDE_11
+                   override
     {
         if (!(m_on <= state.getTime() && state.getTime() <= m_off))
             return;
@@ -1069,11 +1045,11 @@ public:
     }
 
     // No potential energy.
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11 {return 0;}
+    Real calcPotentialEnergy(const State& state) const override {return 0;}
 
     void calcDecorativeGeometryAndAppend
        (const State& state, Stage stage, 
-        Array_<DecorativeGeometry>& geometry) const OVERRIDE_11
+        Array_<DecorativeGeometry>& geometry) const override
     {
         const Real ScaleFactor = 0.1;
         if (stage != Stage::Time) return;
@@ -1232,7 +1208,8 @@ int main(int argc, char** argv) {
     mbs.addEventReporter(new Nada(ReportInterval));
     #endif
 
-    viz.addFrameController(new BodyWatcher(brick));
+    viz.addFrameController(
+            new Visualizer::BodyFollower(brick, Vec3(0), Vec3(0, 1, 5)));
 
     Vec3 cameraPos(0, 1, 2);
     UnitVec3 cameraZ(0,0,1);

@@ -60,7 +60,6 @@ template <class ELT> class Matrix_ : public MatrixBase<ELT> {
     typedef MatrixBase<ENeg>    BaseNeg;
     typedef MatrixBase<EHerm>   BaseHerm;
 
-    typedef Matrix_<ELT>        T;
     typedef MatrixView_<ELT>    TView;
     typedef Matrix_<ENeg>       TNeg;
 
@@ -134,9 +133,9 @@ public:
     // Functions to be used for Scripting in MATLAB and languages that do not support operator overloading
     /** toString() returns a string representation of the Matrix_. Please refer to operator<< for details. **/
     std::string toString() const {
-		std::stringstream stream;
-	    stream <<  (*this) ;
-		return stream.str(); 
+        std::stringstream stream;
+        stream <<  (*this) ;
+        return stream.str(); 
     }
     /** Variant of indexing operator that's scripting friendly to get entry (i, j) **/
     const ELT& get(int i,int j) const { return this->getElt(i,j); }

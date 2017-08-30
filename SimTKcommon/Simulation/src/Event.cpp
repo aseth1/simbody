@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2008-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2008-14 Stanford University and the Authors.        *
  * Authors: Michael Sherman                                                   *
  * Contributors:                                                              *
  *                                                                            *
@@ -73,11 +73,9 @@ std::string Event::eventTriggerString(Trigger e) {
 
     // should have accounted for everything by now
     if (e != NoEventTrigger) {
-        char buf[128];
-        std::sprintf(buf, "0x%x", (unsigned)e);
         if (s.size()) s += " + ";
         s += "UNRECOGNIZED EVENT TRIGGER GARBAGE ";
-        s += buf;
+        s += String((unsigned)e, "0x%x");
     }
     return s;
 }
@@ -177,11 +175,6 @@ EventTriggerInfo::setRequiredLocalizationTimeWindow(Real w) {
     updRep().localizationWindow = w; 
     return *this;
 }
-    ////////////////////////////
-    // EVENT TRIGGER INFO REP //
-    ////////////////////////////
-
-// All inline currently.
 
 } // namespace SimTK
 

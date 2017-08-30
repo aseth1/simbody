@@ -51,7 +51,7 @@ typedef struct {
 
   int d_ml;               /* lower bandwidth of Jacobian                  */
   int d_mu;               /* upper bandwidth of Jacobian                  */ 
-  int d_smu;              /* upper bandwith of M = MIN(N-1,d_mu+d_ml)     */
+  int d_smu;              /* upper bandwidth of M = MIN(N-1,d_mu+d_ml)     */
 
   CPDlsDenseJacExplFn d_djacE; /* dense Jacobian routine (CP_EXPL)        */
   CPDlsDenseJacImplFn d_djacI; /* dense Jacobian routine (CP_IMPL)        */
@@ -126,30 +126,30 @@ typedef struct {
  */
 
 int cpDlsDenseDQJacExpl(int N, realtype t,
-			N_Vector y, N_Vector fy, 
-			DlsMat Jac, void *jac_data,
-			N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+                        N_Vector y, N_Vector fy, 
+                        DlsMat Jac, void *jac_data,
+                        N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
   
 int cpDlsDenseDQJacImpl(int N, realtype t, realtype gm,
-			N_Vector y, N_Vector yp, N_Vector r, 
-			DlsMat Jac, void *jac_data,
-			N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+                        N_Vector y, N_Vector yp, N_Vector r, 
+                        DlsMat Jac, void *jac_data,
+                        N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 int cpDlsBandDQJacExpl(int N, int mupper, int mlower,
-		       realtype t, N_Vector y, N_Vector fy, 
-		       DlsMat Jac, void *jac_data,
-		       N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+                       realtype t, N_Vector y, N_Vector fy, 
+                       DlsMat Jac, void *jac_data,
+                       N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 int cpDlsBandDQJacImpl(int N, int mupper, int mlower,
-		       realtype t, realtype gm, 
-		       N_Vector y, N_Vector yp, N_Vector r,
-		       DlsMat Jac, void *jac_data,
-		       N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+                       realtype t, realtype gm, 
+                       N_Vector y, N_Vector yp, N_Vector r,
+                       DlsMat Jac, void *jac_data,
+                       N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 int cpDlsDenseProjDQJac(int Nc, int Ny, realtype t,
-			N_Vector y, N_Vector cy, 
-			DlsMat Jac, void *jac_data,
-			N_Vector c_tmp1, N_Vector c_tmp2);
+                        N_Vector y, N_Vector cy, 
+                        DlsMat Jac, void *jac_data,
+                        N_Vector c_tmp1, N_Vector c_tmp2);
 
 /*
  * -----------------------------------------------------------------

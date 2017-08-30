@@ -109,7 +109,7 @@ namespace Ipopt
 
     // Get the starting values provided by the NLP and store them
     // in the ip_data current fields.  The following line only requests
-    // intial values for the primal variables x, but later we might
+    // initial values for the primal variables x, but later we might
     // make this more flexible based on user options.
 
     /////////////////////////////////////////////////////////////////////
@@ -365,10 +365,10 @@ namespace Ipopt
         {
           ip_data.set_trial(iterates);
           printf("grad_x = %e grad_s = %e y_c = %e y_d = %e\n",
-        	 ip_cq.trial_grad_lag_x()->Amax(),
-        	 ip_cq.trial_grad_lag_s()->Amax(),
-        	 y_c->Amax(),
-        	 y_d->Amax());
+             ip_cq.trial_grad_lag_x()->Amax(),
+             ip_cq.trial_grad_lag_s()->Amax(),
+             y_c->Amax(),
+             y_d->Amax());
           iterates = ip_data.trial()->MakeNewContainer();
         }
         */

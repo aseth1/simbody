@@ -50,7 +50,7 @@ public:
                         const CompliantContactSubsystem& complCont) 
     :   m_system(system), m_compliant(complCont) {}
 
-    virtual void generateDecorations(const State& state, Array_<DecorativeGeometry>& geometry) {
+    virtual void generateDecorations(const State& state, Array_<DecorativeGeometry>& geometry) override {
         const Vec3 frcColors[] = {Red,Orange,Cyan};
         const Vec3 momColors[] = {Blue,Green,Purple};
         m_system.realize(state, Stage::Velocity);
@@ -97,7 +97,7 @@ public:
 
     ~MyReporter() {}
 
-    void handleEvent(const State& state) const {
+    void handleEvent(const State& state) const override {
         m_system.realize(state, Stage::Dynamics);
         cout << state.getTime() << ": E = " << m_system.calcEnergy(state)
              << " Ediss=" << m_compliant.getDissipatedEnergy(state)
@@ -141,11 +141,9 @@ int main() {
 
     std::ifstream meshFile1, meshFile2;
     PolygonalMesh femurMesh; 
-    meshFile1.open("ContactBigMeshes_Femur.obj"); 
-    femurMesh.loadObjFile(meshFile1); meshFile1.close();
+    femurMesh.loadObjFile("ContactBigMeshes_Femur.obj"); 
     PolygonalMesh patellaMesh; 
-    meshFile2.open("ContactBigMeshes_Patella.obj"); 
-    patellaMesh.loadObjFile(meshFile2); meshFile2.close();
+    patellaMesh.loadObjFile("ContactBigMeshes_Patella.obj"); 
 
     ContactGeometry::TriangleMesh femurTri(femurMesh);
     ContactGeometry::TriangleMesh patellaTri(patellaMesh);

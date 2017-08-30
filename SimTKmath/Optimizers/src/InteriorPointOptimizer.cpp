@@ -26,6 +26,9 @@
 using std::cout;
 using std::endl;
 
+#ifdef _MSC_VER
+#pragma warning(disable:4996) // don't warn about strcat, sprintf, etc.
+#endif
 
 namespace SimTK {
 
@@ -52,7 +55,7 @@ static std::string applicationReturnStatusToString(int status) {
     }
 }
 Optimizer::OptimizerRep* InteriorPointOptimizer::clone() const {
-	return( new InteriorPointOptimizer(*this) );
+    return new InteriorPointOptimizer(*this);
 }
 
 // Assume by the time this constructor is called, the number of parameters and constraints has been finalized

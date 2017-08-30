@@ -9,7 +9,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2007-13 Stanford University and the Authors.        *
+ * Portions copyright (c) 2007-15 Stanford University and the Authors.        *
  * Authors: Michael Sherman                                                   *
  * Contributors:                                                              *
  *                                                                            *
@@ -59,11 +59,13 @@ public:
     // relative to the body frame only.
     //
     // Return an index that can be used to find this decoration later; the
-    // index must be the same in all copies of this Body.
+    // index must be the same in all copies of this Body. The same index is
+    // stored in the copied DecorativeGeometry object.
     int addDecoration(const Transform& X_BD, const DecorativeGeometry& g) {
         const int nxt = (int)decorations.size();
         decorations.push_back(g); // make a new copy
         DecorativeGeometry& myg = decorations.back();
+        myg.setIndexOnBody(nxt);
         myg.setTransform(X_BD*myg.getTransform());
         return nxt;
     }
@@ -72,7 +74,7 @@ public:
                                   Array_<DecorativeGeometry>& geom) const 
     {
         for (int i=0; i<(int)decorations.size(); ++i) {
-            geom.push_back(decorations[i]);
+            geom.push_back(decorations[i]); // copies index and userRef
             geom.back().setBodyId(id);
         }
     }
@@ -104,13 +106,13 @@ public:
     }
     explicit RigidRep(const MassProperties& m) : BodyRep(), defaultMassProperties(m) {
     }
-    const MassProperties& getDefaultRigidBodyMassProperties() const {
+    const MassProperties& getDefaultRigidBodyMassProperties() const override {
         return defaultMassProperties;
     }
-    void setDefaultRigidBodyMassProperties(const MassProperties& m) {
+    void setDefaultRigidBodyMassProperties(const MassProperties& m) override {
         defaultMassProperties = m;
     }
-    RigidRep* clone() const {
+    RigidRep* clone() const override {
         return new RigidRep(*this);
     }
     const Body::Rigid& getMyRigidBodyHandle() const {
@@ -130,17 +132,18 @@ private:
 class Body::Ground::GroundRep : public Body::BodyRep {
 public:
     GroundRep() 
-    :   BodyRep(), infiniteMassProperties(Infinity, Vec3(0), Inertia(Infinity))
+    :   BodyRep(), infiniteMassProperties(Infinity, Vec3(0),
+                                          UnitInertia(Infinity))
     {
     }
-    GroundRep* clone() const {
+    GroundRep* clone() const override {
         return new GroundRep(*this);
     }
-    const MassProperties& getDefaultRigidBodyMassProperties() const {
+    const MassProperties& getDefaultRigidBodyMassProperties() const override {
         return infiniteMassProperties;
     }
     
-    void setDefaultRigidBodyMassProperties(const MassProperties&) {
+    void setDefaultRigidBodyMassProperties(const MassProperties&) override {
         SimTK_THROW1(Exception::Cant, "You can't change Ground's mass properties!");
     }
 
@@ -164,14 +167,14 @@ public:
     :   BodyRep(), zeroMassProperties(0, Vec3(0), Inertia(0)) 
     {
     }
-    MasslessRep* clone() const {
+    MasslessRep* clone() const override {
         return new MasslessRep(*this);
     }
-    const MassProperties& getDefaultRigidBodyMassProperties() const {
+    const MassProperties& getDefaultRigidBodyMassProperties() const override {
         return zeroMassProperties;
     }
     
-    void setDefaultRigidBodyMassProperties(const MassProperties&) {
+    void setDefaultRigidBodyMassProperties(const MassProperties&) override {
         SimTK_THROW1(Exception::Cant, "You can't change a massless body's mass properties!");
     }
 

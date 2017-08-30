@@ -272,7 +272,7 @@ public:
     :   m_unis(unis) {}
 
     void generateDecorations(const State&                state, 
-                             Array_<DecorativeGeometry>& geometry) OVERRIDE_11
+                             Array_<DecorativeGeometry>& geometry) override
     {
         for (unsigned i=0; i < m_unis.size(); ++i) {
             const MyUnilateralConstraint& uni = *m_unis[i];
@@ -318,7 +318,7 @@ public:
     int getNumSavedStates() const {return (int)m_states.size();}
     const State& getState(int n) const {return m_states[n];}
 
-    void handleEvent(const State& s) const {
+    void handleEvent(const State& s) const override {
         const SimbodyMatterSubsystem& matter=m_system.getMatterSubsystem();
         const SpatialVec PG = matter.calcSystemMomentumAboutGroundOrigin(s);
 
@@ -369,7 +369,7 @@ public:
     }
 
     // This is the witness function.
-    Real getValue(const State& state) const {
+    Real getValue(const State& state) const override {
         const SimbodyMatterSubsystem& matter = m_mbs.getMatterSubsystem();
         const MyUnilateralConstraint& uni = *m_unis[m_which];
         if (!uni.isDisabled(state)) 
@@ -405,7 +405,7 @@ public:
     // of restitution to calculate the rest of the impulse, then apply
     // both impulses to produce changes in velocity. In most cases this
     // will produce the same rebound velocity as Newton, but not always.
-    void handleEvent(State& s, Real accuracy, bool& shouldTerminate) const;
+    void handleEvent(State& s, Real accuracy, bool& shouldTerminate) const override;
 
 
     // Make a list of all the unilateral constraints that could conceivably
@@ -500,7 +500,7 @@ public:
     }
 
     // This is the witness function.
-    Real getValue(const State& state) const {
+    Real getValue(const State& state) const override {
         const MyUnilateralConstraint& uni = *m_unis[m_which];
         if (uni.isDisabled(state)) return 0;
         const Real f = uni.getForce(state);
@@ -508,7 +508,7 @@ public:
     }
 
     void handleEvent
-       (State& s, Real accuracy, bool& shouldTerminate) const 
+       (State& s, Real accuracy, bool& shouldTerminate) const override 
     {
         SimTK_DEBUG("\n----------------------------------------------------\n");
         SimTK_DEBUG2("LIFTOFF triggered by constraint %d @t=%.15g\n", 
@@ -566,25 +566,25 @@ public:
     }
 
 
-    Real getPerr(const State& s) const OVERRIDE_11 {
+    Real getPerr(const State& s) const override {
         const Vec3 p = m_body.findStationLocationInGround(s, m_point);
         return p[YAxis];
     }
-    Real getVerr(const State& s) const OVERRIDE_11 {
+    Real getVerr(const State& s) const override {
         const Vec3 v = m_body.findStationVelocityInGround(s, m_point);
         return v[YAxis];
     }
-    Real getAerr(const State& s) const OVERRIDE_11 {
+    Real getAerr(const State& s) const override {
         const Vec3 a = m_body.findStationAccelerationInGround(s, m_point);
         return a[YAxis];
     }
 
-    Vec3 whereToDisplay(const State& state) const OVERRIDE_11 {
+    Vec3 whereToDisplay(const State& state) const override {
         return m_body.findStationLocationInGround(state,m_point);
     }
 
     void recordImpulse(ImpulseType type, const State& state,
-                      const Vector& lambda) OVERRIDE_11
+                      const Vector& lambda) override
     {
         Super::recordImpulse(type, state, lambda);
 
@@ -599,7 +599,7 @@ public:
     }
 
     void setMyDesiredDeltaV(const State& s,
-                            Vector& desiredDeltaV) const OVERRIDE_11
+                            Vector& desiredDeltaV) const override
     {
         Super::setMyDesiredDeltaV(s, desiredDeltaV);
         const Vec3 dv = 
@@ -612,13 +612,13 @@ public:
     }
 
     // Note that recordStartingLocation() must have been called first.
-    void enable(State& state) const OVERRIDE_11 {
+    void enable(State& state) const override {
         Super::enable(state);
         m_noslipX.setContactPoint(state, m_groundPoint);
         m_noslipZ.setContactPoint(state, m_groundPoint);
         m_noslipX.enable(state); m_noslipZ.enable(state);
     }
-    void disable(State& state) const OVERRIDE_11 {
+    void disable(State& state) const override {
         Super::disable(state);
         m_noslipX.disable(state); m_noslipZ.disable(state);
     }
@@ -626,7 +626,7 @@ public:
     // Set the ground point to be the projection of the follower point
     // onto the ground plane. This will be used the next time this constraint
     // is enabled.
-    void initializeForImpact(const State& s) OVERRIDE_11 {
+    void initializeForImpact(const State& s) override {
         Super::initializeForImpact(s);
         const Vec3 p = m_body.findStationLocationInGround(s, m_point);
         m_groundPoint = p;
@@ -669,20 +669,20 @@ public:
         m_sign(side==Lower?1.:-1.), m_limit(limit)
     {}
 
-    Real getPerr(const State& state) const OVERRIDE_11 {
+    Real getPerr(const State& state) const override {
         const Real q = m_body.getOneQ(state, m_whichq);
         return m_sign*(q-m_limit);
     }
-    Real getVerr(const State& state) const OVERRIDE_11 {
+    Real getVerr(const State& state) const override {
         const Real u = m_body.getOneU(state, m_whichu);
         return m_sign*u;
     }
-    Real getAerr(const State& state) const OVERRIDE_11 {
+    Real getAerr(const State& state) const override {
         const Real udot = m_body.getOneUDot(state, m_whichu);
         return m_sign*udot;
     }
 
-    Vec3 whereToDisplay(const State& state) const OVERRIDE_11 {
+    Vec3 whereToDisplay(const State& state) const override {
         const Vec3& p_B = m_body.getOutboardFrame(state).p();
         return m_body.findStationLocationInGround(state,p_B);
     }
@@ -711,20 +711,20 @@ public:
     {}
 
 
-    Real getPerr(const State& s) const OVERRIDE_11 {
+    Real getPerr(const State& s) const override {
         const Vec3 p1 = m_body1.findStationLocationInGround(s,m_point1);
         const Vec3 p2 = m_body2.findStationLocationInGround(s,m_point2);
         const Vec3 p = p2-p1;
         return (square(m_dist) - dot(p,p))/2;
     }
-    Real getVerr(const State& s) const OVERRIDE_11 {
+    Real getVerr(const State& s) const override {
         Vec3 p1, v1, p2, v2;
         m_body1.findStationLocationAndVelocityInGround(s,m_point1,p1,v1);
         m_body2.findStationLocationAndVelocityInGround(s,m_point2,p2,v2);
         const Vec3 p = p2 - p1, v = v2 - v1;
         return -dot(v, p);
     }
-    Real getAerr(const State& s) const OVERRIDE_11 {
+    Real getAerr(const State& s) const override {
         Vec3 p1, v1, a1, p2, v2, a2;
         m_body1.findStationLocationVelocityAndAccelerationInGround
            (s,m_point1,p1,v1,a1);
@@ -734,7 +734,7 @@ public:
         return -(dot(a, p) + dot(v, v));
     }
 
-    Vec3 whereToDisplay(const State& state) const OVERRIDE_11 {
+    Vec3 whereToDisplay(const State& state) const override {
         return m_body2.findStationLocationInGround(state,m_point2);
     }
 
@@ -1332,7 +1332,7 @@ updateVelocities(const Vector& u0, const Vector& lambda, State& state) const {
 // lead to a negative acceleration.
 // This is invoked by the ContactOff handler, and as the last step of the
 // ContactOn (impact) handler.
-// TODO: need to search for a consistent set of active contraints.
+// TODO: need to search for a consistent set of active constraints.
 
 /*static*/ void ContactOff::disablePullingContacts
    (const MultibodySystem& mbs, State& s, 

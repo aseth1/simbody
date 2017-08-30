@@ -37,13 +37,16 @@
 
 using SimTK::String;
 
+#ifdef _MSC_VER
+#pragma warning(disable:4996) // don't warn about sprintf, etc.
+#endif
+
 String::String(float r, const char* fmt) {
     if (!isFinite(r)) {
         if (isNaN(r)) {(*this)="NaN"; return;}
         if (isInf(r)) {(*this)=(r<0?"-Inf":"Inf"); return;}
-        SimTK_ERRCHK2_ALWAYS(false, "SimTK::String(float)",
-            "Unrecognized non-finite value %g (0x%x).", 
-            (double)r, *reinterpret_cast<const unsigned*>(&r));
+        SimTK_ERRCHK1_ALWAYS(false, "SimTK::String(float)",
+            "Unrecognized non-finite value %g.", (double)r);
         return;
     }
     char buf[64]; sprintf(buf,fmt,r); (*this)=buf; 
@@ -53,9 +56,8 @@ String::String(double r, const char* fmt) {
     if (!isFinite(r)) {
         if (isNaN(r)) {(*this)="NaN"; return;}
         if (isInf(r)) {(*this)=(r<0?"-Inf":"Inf"); return;}
-        SimTK_ERRCHK2_ALWAYS(false, "SimTK::String(double)",
-            "Unrecognized non-finite value %g (0x%llx).", 
-            r, *reinterpret_cast<const unsigned long long*>(&r));
+        SimTK_ERRCHK1_ALWAYS(false, "SimTK::String(double)",
+            "Unrecognized non-finite value %g.", r);
         return;
     }
     char buf[64]; sprintf(buf,fmt,r); (*this)=buf; 
@@ -80,8 +82,8 @@ bool String::tryConvertToBool(bool& out) const {
     const String adjusted = cleanUp(*this);
     if (adjusted=="true")  {out=true;  return true;}
     if (adjusted=="false") {out=false; return true;}
-	std::istringstream sstream(adjusted);
-	sstream >> out;
+    std::istringstream sstream(adjusted);
+    sstream >> out;
     return !sstream.fail();
 }
 
@@ -93,8 +95,8 @@ bool String::tryConvertToFloat(float& out) const {
     {   out = NTraits<float>::getInfinity(); return true;}
     if (adjusted=="-inf" || adjusted=="-infinity") 
     {   out = -NTraits<float>::getInfinity(); return true;}
-	std::istringstream sstream(adjusted);
-	sstream >> out;
+    std::istringstream sstream(adjusted);
+    sstream >> out;
     return !sstream.fail();
 }
 
@@ -106,8 +108,8 @@ bool String::tryConvertToDouble(double& out) const {
     {   out = NTraits<double>::getInfinity(); return true;}
     if (adjusted=="-inf" || adjusted=="-infinity") 
     {   out = -NTraits<double>::getInfinity(); return true;}
-	std::istringstream sstream(adjusted);
-	sstream >> out;
+    std::istringstream sstream(adjusted);
+    sstream >> out;
     return !sstream.fail();
 }
 
@@ -119,8 +121,8 @@ bool String::tryConvertToLongDouble(long double& out) const {
     {   out = NTraits<long double>::getInfinity(); return true;}
     if (adjusted=="-inf" || adjusted=="-infinity") 
     {   out = -NTraits<long double>::getInfinity(); return true;}
-	std::istringstream sstream(adjusted);
-	sstream >> out;
+    std::istringstream sstream(adjusted);
+    sstream >> out;
     return !sstream.fail();
 }
 
@@ -156,7 +158,7 @@ String String::trimWhiteSpace(const std::string& in) {
     // Find first non-white character position of "in".
     int firstNonWhite = 0;
     for ( ; firstNonWhite < inz; ++firstNonWhite)
-        if (!std::isspace(in[firstNonWhite])) break;
+        if (!std::isspace((unsigned char)in[firstNonWhite])) break;
 
     if (firstNonWhite == inz)
         return String();    // "in" was all white space
@@ -164,7 +166,7 @@ String String::trimWhiteSpace(const std::string& in) {
     // Find last non-white character position of "in".
     int lastNonWhite = inz-1;
     for ( ; lastNonWhite >= 0; --lastNonWhite)
-        if (!std::isspace(in[lastNonWhite])) break;
+        if (!std::isspace((unsigned char)in[lastNonWhite])) break;
 
     return String(in, firstNonWhite, (lastNonWhite+1) - firstNonWhite);
 }

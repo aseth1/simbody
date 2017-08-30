@@ -9,7 +9,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2010-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2010-14 Stanford University and the Authors.        *
  * Authors: Peter Eastman, Michael Sherman                                    *
  * Contributors:                                                              *
  *                                                                            *
@@ -34,6 +34,7 @@ for display and interaction through the visualizer. **/
 
 namespace SimTK {
 
+class MobilizedBody;
 class MultibodySystem;
 class DecorationGenerator;
 
@@ -146,6 +147,7 @@ problems. **/
 class SimTK_SIMBODY_EXPORT Visualizer {
 public:
 class FrameController; // defined below
+class BodyFollower;    // declared below, defined in Visualizer.cpp
 class InputListener;   // defined in Visualizer_InputListener.h
 class InputSilo;       //                 "
 class Reporter;        // defined in Visualizer_Reporter.h
@@ -161,17 +163,27 @@ background we'll use a plain white background instead. You can override the
 chosen defaults using %Visualizer methods setSystemUpDirection() and 
 setBackgroundType(). 
 
-Simbody is shipped with a separate executable program that provides the 
-graphics display and collects user input. Normally that executable is 
-installed in the "bin" subdirectory of the Simbody installation directory.
-However, first we look in the same directory as the currently-running
-executable and, if found, we will use that visualizer. If no visualizer
-is found with the executable, we check if environment variables SIMBODY_HOME 
-or SimTK_INSTALL_DIR exist, and look in their "bin" subdirectories if so.
-Otherwise we'll look in defaultInstallDir/SimTK/bin where defaultInstallDir
-is the ProgramFiles registry entry on Windows, or /usr/local on other platforms.
-The other constructor allows specification of a search path that will be 
+Simbody is shipped with a separate executable program simbody-visualizer
+(simbody-visualizer_d if building as Debug) that provides the graphics display
+and collects user input. Normally that executable is installed in the "bin"
+subdirectory of the Simbody installation directory.  However, first we look in
+the same directory as the currently-running executable and, if found, we will
+use that visualizer. If no visualizer is found with the executable, we check if
+environment variables SIMBODY_HOME or SimTK_INSTALL_DIR exist, and look in
+their "bin" (or "libexec/simbody" on UNIX) subdirectories if so. Next, we
+attempt to use the relative path from the SimTKsimbody library to the
+simbody-visualizer (this helps if Simbody is relocated, but does not work on
+Windows, or if using static Simbody libraries). Then, we check the installed
+location of the visualizer, as specified when Simbody is compiled. If the
+visualizer is not there, we'll look in platform-specific default locations.
+The other constructor allows specification of a search path that will be
 checked before attempting to find the installation directory.
+
+If you want to override the name of the visualizer executable for which Simbody
+searches, set the environment variable SIMBODY_VISUALIZER_NAME
+to the desired executable name. For example, if you want to use the
+debug visualizer with release libraries, set SIMBODY_VISUALIZER_NAME
+to simbody-visualizer_d.
 
 The SimTK::Pathname class is used to process the supplied search path, which
 can consist of absolute, working directory-relative, or executable 
@@ -376,7 +388,7 @@ Real getGroundHeight() const;
 choices, and the discussion for the Visualizer class for meanings.
 @param[in]  mode    The new Mode to use.
 @return A reference to this Visualizer so that you can chain "set" calls. **/
-void setMode(Mode mode);
+Visualizer& setMode(Mode mode);
 /** Get the current mode being used by the Visualizer. See \ref Visualizer::Mode
 for the choices, and the discussion for the Visualizer class for meanings. **/
 Mode getMode() const;
@@ -632,9 +644,11 @@ DecorationGenerator& updDecorationGenerator(int i);
 /**@}**/
 
 /** @name                Frame control methods
-These methods can be called prior to rendering a frame to control how the 
+These methods can be called prior to rendering a frame to control how the
 camera is positioned for that frame. These can be invoked from within a
-FrameController object for runtime camera control and other effects. **/
+FrameController object for runtime camera control and other effects. See the
+Visualizer::BodyFollower class for an example of a FrameController that causes
+the camera to follow a body. **/
 /**@{**/
 
 /** Set the transform defining the position and orientation of the camera.
@@ -751,6 +765,48 @@ public:
     /** Destructor is virtual; be sure to override it if you have something
     to clean up at the end. **/
     virtual ~FrameController() {}
+};
+
+/** Causes the camera to point at and follow a point fixed on a body (a
+ station). This might be useful if your system translates substantially
+ and would thus leave the field of view of a stationary camera. **/
+// This class is based on the BodyWatcher class that used to be in TimsBox.cpp.
+class SimTK_SIMBODY_EXPORT Visualizer::BodyFollower :
+    public Visualizer::FrameController {
+public:
+    /**
+    @param[in] mobodB
+       The MobilizedBody to follow, designated as B.
+    @param[in] stationPinB
+       The location of the station P on the body to follow, expressed in B. By
+       default, P is the origin of the MobilizedBody.
+    @param[in] offset
+       Position of the camera from P, expressed in ground. Cannot be the zero
+       vector. By default, this is (1, 1, 1) + h * u, where h is
+       Visualizer::getGroundHeight() and u is
+       Visualizer::getSystemUpDirection().
+    @param[in] upDirection
+       Controls the rotation of the camera about the offset vector. The
+       camera's up (+y) direction will be aligned with this vector as best as
+       is possible. Expressed in ground. By default, this is
+       Visualizer::getSystemUpDirection(); it's unlikely that you want
+       something other than the default.
+    **/
+    BodyFollower(const MobilizedBody& mobodB,
+                 const Vec3&          stationPinB = Vec3(0, 0, 0),
+                 const Vec3&          offset      = Vec3(NaN),
+                 const UnitVec3&      upDirection = UnitVec3());
+
+    void generateControls(
+            const Visualizer&             viz,
+            const State&                  state,
+            Array_< DecorativeGeometry >& geometry) override;
+
+private:
+    const MobilizedBody& m_mobodB;
+    const Vec3&          m_stationPinB;
+    const Vec3&          m_offset;
+    const UnitVec3&      m_upDirection;
 };
 
 /** OBSOLETE: This provides limited backwards compatibility with the old

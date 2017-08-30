@@ -36,7 +36,9 @@ using std::tolower;
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
+    #if !defined(NOMINMAX)
     #define NOMINMAX
+    #endif
     #include <windows.h>
     #include <direct.h>
     #pragma warning(disable:4996) // getenv() is apparently unsafe
@@ -232,7 +234,7 @@ void* Plugin::getSymbolAddress(void* handle, const string& name, string& errorMe
     errorMessage.clear();
 
     #ifdef _WIN32
-        address = GetProcAddress((HMODULE)handle, name.c_str());
+        address = (void*)GetProcAddress((HMODULE)handle, name.c_str());
         if (!address)
             errorMessage = getWindowsSystemMessage();
     #else

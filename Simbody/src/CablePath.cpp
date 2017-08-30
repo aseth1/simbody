@@ -741,7 +741,7 @@ public:
         state(state),instInfo(instInfo),localPpe(ppe)
     {   setEstimatedAccuracy(accuracy); }
 
-    int f(const Vector& x, Vector& fx) const OVERRIDE_11 {
+    int f(const Vector& x, Vector& fx) const override {
         localPpe.x = x;
         path.calcPathError(state, instInfo, localPpe);
         fx = localPpe.err;
@@ -1595,7 +1595,7 @@ public:
         prevGeodesic(prevGeodesic)
     {   setEstimatedAccuracy(accuracy); }
 
-    int f(const Vector& x, Vector& fx) const {
+    int f(const Vector& x, Vector& fx) const override {
         UnitVec3 eIn, eOut;
         Vec3     xP, xQ;
         Geodesic newGeodesic; // throw away

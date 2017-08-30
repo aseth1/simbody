@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2010-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2010-14 Stanford University and the Authors.        *
  * Authors: Peter Eastman, Michael Sherman                                    *
  * Contributors:                                                              *
  *                                                                            *
@@ -27,19 +27,20 @@
 #include "simbody/internal/SimbodyMatterSubsystem.h"
 #include "simbody/internal/ContactTrackerSubsystem.h"
 
-#include <algorithm>
+#include <utility>
 using std::pair; using std::make_pair;
 #include <iostream>
 using std::cout; using std::endl;
 #include <set>
 
-
-namespace SimTK {
+using namespace SimTK;
 
 // We keep a list of all the ContactSurfaces being tracked by this
 // subsystem, and a separate list of "bubble wrap" spheres that are 
 // used in broad phase determination of which contact surfaces need
 // to be examined more closely by ContactTracker objects.
+
+namespace { // these are local to this file
 
 SimTK_DEFINE_UNIQUE_INDEX_TYPE(BubbleIndex);
 
@@ -96,7 +97,7 @@ typedef std::map< pair<ContactGeometryTypeId,ContactGeometryTypeId>,
 typedef std::map<ContactSurfaceIndex,const Contact*> ContactSurfaceSet;
 typedef std::map<ContactSurfaceIndex,ContactSurfaceSet> PairMap;
 
-static std::ostream& operator<<(std::ostream& o, const ContactSurfaceSet& css) {
+std::ostream& operator<<(std::ostream& o, const ContactSurfaceSet& css) {
     ContactSurfaceSet::const_iterator p = css.begin();
     o << "{";
     for (; p != css.end(); ++p) {
@@ -105,7 +106,8 @@ static std::ostream& operator<<(std::ostream& o, const ContactSurfaceSet& css) {
     }
     return o << "}";
 }
-static std::ostream& operator<<(std::ostream& o, const PairMap& pm) {
+
+std::ostream& operator<<(std::ostream& o, const PairMap& pm) {
     PairMap::const_iterator p = pm.begin();
     for (; p != pm.end(); ++p) {
         if (p != pm.begin()) o << endl;
@@ -114,8 +116,9 @@ static std::ostream& operator<<(std::ostream& o, const PairMap& pm) {
     return o;
 }
 
+} // end of anonymous namespace
 
-
+namespace SimTK {
 //==============================================================================
 //                       CONTACT TRACKER SUBSYSTEM IMPL
 //==============================================================================
@@ -127,6 +130,7 @@ ContactTrackerSubsystemImpl() : m_defaultTracker(0) {
     adoptContactTracker(new ContactTracker::HalfSpaceSphere());
     adoptContactTracker(new ContactTracker::SphereSphere());
     adoptContactTracker(new ContactTracker::HalfSpaceEllipsoid());
+    adoptContactTracker(new ContactTracker::HalfSpaceBrick());
     adoptContactTracker(new ContactTracker::HalfSpaceTriangleMesh());
     adoptContactTracker(new ContactTracker::SphereTriangleMesh());
     adoptContactTracker(new ContactTracker::TriangleMeshTriangleMesh());
@@ -149,7 +153,7 @@ ContactTrackerSubsystemImpl() : m_defaultTracker(0) {
     // The map itself gets deleted automatically.
 }
 
-ContactTrackerSubsystemImpl* cloneImpl() const 
+ContactTrackerSubsystemImpl* cloneImpl() const override 
 {   return new ContactTrackerSubsystemImpl(*this); }
 
 void adoptContactTracker(ContactTracker* tracker) {
@@ -195,12 +199,12 @@ const ContactSnapshot& getNextPredictedContacts(const State& state) const {
     return contacts;
 }
 ContactSnapshot& updNextActiveContacts(const State& state) const {
-    ContactSnapshot& contacts = Value<ContactSnapshot>::downcast
+    ContactSnapshot& contacts = Value<ContactSnapshot>::updDowncast
         (updDiscreteVarUpdateValue(state, m_activeContactsIx));
     return contacts;
 }
 ContactSnapshot& updNextPredictedContacts(const State& state) const {
-    ContactSnapshot& contacts = Value<ContactSnapshot>::downcast
+    ContactSnapshot& contacts = Value<ContactSnapshot>::updDowncast
         (updDiscreteVarUpdateValue(state, m_predictedContactsIx));
     return contacts;
 }
@@ -209,7 +213,7 @@ ContactSnapshot& updNextPredictedContacts(const State& state) const {
 // a unique ContactSurfaceIndex. Then for each surface, get its geometry
 // and create a Bubble from each of its bubble wrap spheres; each of those
 // gets a unique BubbleIndex that maps back to the associated surface.
-int realizeSubsystemTopologyImpl(State& state) const {
+int realizeSubsystemTopologyImpl(State& state) const override {
     // Briefly allow writing into the Topology cache; after this the
     // Topology cache is const.
     ContactTrackerSubsystemImpl* wThis = 
@@ -224,18 +228,29 @@ int realizeSubsystemTopologyImpl(State& state) const {
     const SimbodyMatterSubsystem& matter = getMatterSubsystem();
 
     const int numBodies = matter.getNumBodies();
+    wThis->m_mobodContactSurfaceIndex.resize(numBodies);
     wThis->m_surfaces.clear();
     wThis->m_bubbles.clear();
 
+    // ContactSurfaceIndex assignments are sequential within a MobilizedBody
+    // so we need only record the first one in order to be able to respond
+    // to getContactSurfaceIndex(mobod,ordinal) requests quickly.
+
     for (MobilizedBodyIndex mbx(0); mbx < numBodies; ++mbx) {
-        const MobilizedBody& mobod = matter.getMobilizedBody(mbx);
-        const Body&          body  = mobod.getBody();
-        for (int i=0; i < body.getNumContactSurfaces(); ++i) {
-            const ContactSurfaceIndex surfx(m_surfaces.size());
+        const MobilizedBody& mobod  = matter.getMobilizedBody(mbx);
+        const Body&          body   = mobod.getBody();
+        const int            nSurfs = body.getNumContactSurfaces();
+        const ContactSurfaceIndex firstIx = 
+            nSurfs ? ContactSurfaceIndex(m_surfaces.size())
+                   : InvalidContactSurfaceIndex;
+        wThis->m_mobodContactSurfaceIndex[mbx] = make_pair(firstIx,nSurfs);
+        for (int i=0; i < nSurfs; ++i) {
+            const ContactSurfaceIndex surfx(firstIx + i);
             wThis->m_surfaces.push_back(); // default construct
             Surface& surf = wThis->m_surfaces.back();
             surf.mobod   = &mobod; 
             surf.surface = &body.getContactSurface(i);
+            assert(surf.surface->getIndexOnBody() == i);
             surf.X_BS    =  body.getContactSurfaceTransform(i);
             const ContactGeometry& geo  = surf.surface->getShape();
             // for each bubble:
@@ -251,11 +266,11 @@ int realizeSubsystemTopologyImpl(State& state) const {
     return 0;
 }
 
-int realizeSubsystemPositionImpl(const State& state) const {
+int realizeSubsystemPositionImpl(const State& state) const override {
     return 0;
 }
 
-int realizeSubsystemVelocityImpl(const State& state) const {
+int realizeSubsystemVelocityImpl(const State& state) const override {
     return 0;
 }
 
@@ -491,12 +506,12 @@ void ensurePredictedContactsUpdated(const State& state) const {
     markDiscreteVarUpdateValueRealized(state, m_predictedContactsIx);
 }
 
-int realizeSubsystemDynamicsImpl(const State& state) const {
+int realizeSubsystemDynamicsImpl(const State& state) const override {
     ensureActiveContactsUpdated(state);
     return 0;
 }
 
-int realizeSubsystemAccelerationImpl(const State& state) const {
+int realizeSubsystemAccelerationImpl(const State& state) const override {
     ensurePredictedContactsUpdated(state);
     return 0;
 }
@@ -534,6 +549,25 @@ getContactTracker(ContactGeometryTypeId id1, ContactGeometryTypeId id2,
 int getNumSurfaces() const {return m_surfaces.size();}
 int getNumBubbles()  const {return m_bubbles.size();}
 
+ContactSurfaceIndex getContactSurfaceIndex(MobilizedBodyIndex mobod, 
+                                           int contactSurfaceOrdinal) const
+{
+    const int nMobods = (int)m_mobodContactSurfaceIndex.size();
+    SimTK_ERRCHK1_ALWAYS(mobod.isValid() && mobod < nMobods,
+        "ContactTrackerSubsystem::getContactSurfaceIndex()",
+        "Illegal mobilized body index %d.", (int)mobod);
+    const pair<ContactSurfaceIndex,int>& 
+        info = m_mobodContactSurfaceIndex[mobod];
+    const int nSurfaces = info.second;
+    SimTK_ERRCHK3_ALWAYS(
+        0 <= contactSurfaceOrdinal && contactSurfaceOrdinal < nSurfaces,
+        "ContactTrackerSubsystem::getContactSurfaceIndex()",
+        "Illegal ContactSurface ordinal %d; mobilized body %d has %d "
+        "contact surfaces.", contactSurfaceOrdinal, (int)mobod, nSurfaces);
+    assert(info.first.isValid());
+    return ContactSurfaceIndex(info.first + contactSurfaceOrdinal);
+}
+
 SimTK_DOWNCAST(ContactTrackerSubsystemImpl, Subsystem::Guts);
 
 private:
@@ -549,13 +583,17 @@ TrackerMap          m_contactTrackers;
 ContactTracker*     m_defaultTracker;
 
     // TOPOLOGY CACHE
-Array_<Surface,ContactSurfaceIndex> m_surfaces;
-Array_<Bubble,BubbleIndex>          m_bubbles;
-DiscreteVariableIndex               m_activeContactsIx;
-DiscreteVariableIndex               m_predictedContactsIx;
+// The pair is the first assigned index, and the number of contact surfaces
+// for a mobod, at last realizeSubsystemTopology() call.
+Array_<pair<ContactSurfaceIndex,int>, MobilizedBodyIndex>  
+                                        m_mobodContactSurfaceIndex;
+Array_<Surface,ContactSurfaceIndex>     m_surfaces;
+Array_<Bubble,BubbleIndex>              m_bubbles;
+DiscreteVariableIndex                   m_activeContactsIx;
+DiscreteVariableIndex                   m_predictedContactsIx;
 };
 
-
+} // namespace SimTK
 
 //==============================================================================
 //                        CONTACT TRACKER SUBSYSTEM
@@ -610,6 +648,11 @@ getContactSurface(ContactSurfaceIndex surfIx) const
 const Transform& ContactTrackerSubsystem::
 getContactSurfaceTransform(ContactSurfaceIndex surfIx) const
 {   return getImpl().m_surfaces[surfIx].X_BS; }
+
+ContactSurfaceIndex ContactTrackerSubsystem::
+getContactSurfaceIndex(MobilizedBodyIndex mobod, 
+                       int contactSurfaceOrdinal) const
+{   return getImpl().getContactSurfaceIndex(mobod,contactSurfaceOrdinal); }
 
 void ContactTrackerSubsystem::
 adoptContactTracker(ContactTracker* tracker)
@@ -666,6 +709,4 @@ realizePredictedContacts(const State& state,
     return true;
 }
 
-
-} // namespace SimTK
 

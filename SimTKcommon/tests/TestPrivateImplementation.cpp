@@ -300,8 +300,11 @@ public:
     string s;
     friend class Concrete;
 };
+
+namespace SimTK {
 template class PIMPLHandle<Concrete,Concrete_Impl>;
 template class PIMPLImplementation<Concrete,Concrete_Impl>;
+}
 
     // CONCRETE REF IMPL //
 class ConcreteRef_Impl : public PIMPLImplementation<ConcreteRef,ConcreteRef_Impl> {
@@ -310,8 +313,11 @@ public:
     string s;
     friend class ConcreteRef;
 };
+
+namespace SimTK {
 template class PIMPLHandle<ConcreteRef,ConcreteRef_Impl,true>;
 template class PIMPLImplementation<ConcreteRef,ConcreteRef_Impl>;
+}
 
     // CONCRETE & CONCRETE REF HANDLE IMPLEMENTATIONS //
 Concrete::Concrete()       : HandleBase(new Concrete_Impl()) { }
@@ -335,12 +341,15 @@ private:
     string name;
     friend class MyHandle;
 };
+
+namespace SimTK {
 template class PIMPLHandle<MyHandle,MyHandle_Impl>;
 template class PIMPLImplementation<MyHandle,MyHandle_Impl>;
+}
 
 class DerivedHandle_Impl : public MyHandle_Impl {
 public:
-    virtual DerivedHandle_Impl* clone() const {return new DerivedHandle_Impl(*this);}
+    virtual DerivedHandle_Impl* clone() const override {return new DerivedHandle_Impl(*this);}
 
 private:
     Real r;
@@ -349,7 +358,7 @@ private:
 
 class DerDerivedHandle_Impl : public DerivedHandle_Impl {
 public:
-    virtual DerDerivedHandle_Impl* clone() const {return new DerDerivedHandle_Impl(*this);}
+    virtual DerDerivedHandle_Impl* clone() const override {return new DerDerivedHandle_Impl(*this);}
 
 private:
     string s;

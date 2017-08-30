@@ -34,17 +34,17 @@ namespace SimTK {
 // Some common RGB values; these constants are global external symbols exported
 // by the library, defined as externs in DecorativeGeometry.h.
 
-SimTK_SimTKCOMMON_EXPORT const Vec3 Black   = Vec3( 0, 0, 0);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Gray    = Vec3(.5,.5,.5);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Red     = Vec3( 1, 0, 0);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Green   = Vec3( 0, 1, 0);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Blue    = Vec3( 0, 0, 1);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Yellow  = Vec3( 1, 1, 0);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Orange  = Vec3( 1,.5, 0);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Magenta = Vec3( 1, 0, 1);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Purple  = Vec3(.5, 0,.5);
-SimTK_SimTKCOMMON_EXPORT const Vec3 Cyan    = Vec3( 0, 1, 1);
-SimTK_SimTKCOMMON_EXPORT const Vec3 White   = Vec3( 1, 1, 1);
+const Vec3 Black   = Vec3( 0, 0, 0);
+const Vec3 Gray    = Vec3(.5,.5,.5);
+const Vec3 Red     = Vec3( 1, 0, 0);
+const Vec3 Green   = Vec3( 0, 1, 0);
+const Vec3 Blue    = Vec3( 0, 0, 1);
+const Vec3 Yellow  = Vec3( 1, 1, 0);
+const Vec3 Orange  = Vec3( 1,.5, 0);
+const Vec3 Magenta = Vec3( 1, 0, 1);
+const Vec3 Purple  = Vec3(.5, 0,.5);
+const Vec3 Cyan    = Vec3( 0, 1, 1);
+const Vec3 White   = Vec3( 1, 1, 1);
 
     /////////////////////////
     // DECORATIVE GEOMETRY //
@@ -368,6 +368,107 @@ DecorativeMeshFile::DecorativeMeshFile(const std::string& meshFile) {
 }
 const std::string& DecorativeMeshFile::getMeshFile() const {
     return DecorativeMeshFileRep::downcast(*rep).getMeshFile();
+}
+
+const PolygonalMesh& DecorativeMeshFile::getMesh() const {
+    return DecorativeMeshFileRep::downcast(*rep).getMesh();
+}
+
+/////////////////////
+// DECORATIVE TORUS //
+/////////////////////
+
+DecorativeTorus::DecorativeTorus(Real torusR, Real tubeR) {
+    rep = new DecorativeTorusRep(torusR, tubeR);
+    rep->setMyHandle(*this);
+}
+
+Real DecorativeTorus::getTorusRadius() const {
+    return DecorativeTorusRep::downcast(*rep).getTorusRadius();
+}
+
+Real DecorativeTorus::getTubeRadius() const {
+    return DecorativeTorusRep::downcast(*rep).getTubeRadius();
+}
+
+DecorativeTorus& DecorativeTorus::setTorusRadius(Real torR) {
+    DecorativeTorusRep::downcast(*rep).setTorusRadius(torR); return *this;
+}
+DecorativeTorus& DecorativeTorus::setTubeRadius(Real tubeR) {
+    DecorativeTorusRep::downcast(*rep).setTubeRadius(tubeR); return *this;
+}
+
+/////////////////////
+// DECORATIVE ARROW //
+/////////////////////
+
+DecorativeArrow::DecorativeArrow
+    (const Vec3& startPoint, const Vec3& endPoint, Real tipLength) {
+    rep = new DecorativeArrowRep(startPoint, endPoint, tipLength);
+    rep->setMyHandle(*this);
+}
+
+const Vec3& DecorativeArrow::getStartPoint() const {
+    return DecorativeArrowRep::downcast(*rep).getStartPoint();
+};
+const Vec3& DecorativeArrow::getEndPoint() const {
+    return DecorativeArrowRep::downcast(*rep).getEndPoint();
+};
+
+const Real& DecorativeArrow::getTipLength() const{
+    return DecorativeArrowRep::downcast(*rep).getTipLength();
+};
+
+DecorativeArrow& DecorativeArrow::setStartPoint(const Vec3& start) {
+    DecorativeArrowRep::downcast(*rep).setStartPoint(start); return *this;
+}
+
+DecorativeArrow& DecorativeArrow::setEndPoint(const Vec3& end) {
+    DecorativeArrowRep::downcast(*rep).setEndPoint(end); return *this;
+}
+
+DecorativeArrow& DecorativeArrow::setTipLength(Real tipLength) {
+    DecorativeArrowRep::downcast(*rep).setTipLength(tipLength); return *this;
+}
+
+/////////////////////
+// DECORATIVE CONE //
+/////////////////////
+
+DecorativeCone::DecorativeCone
+    (const Vec3& p1, const UnitVec3& dir, Real height, Real baseRadius) {
+    rep = new DecorativeConeRep(p1, dir, height, baseRadius);
+    rep->setMyHandle(*this);
+}
+
+const Vec3& DecorativeCone::getOrigin() const {
+    return DecorativeConeRep::downcast(*rep).getOrigin();
+};
+const UnitVec3& DecorativeCone::getDirection() const {
+    return DecorativeConeRep::downcast(*rep).getDirection();
+};
+const Real& DecorativeCone::getHeight() const{
+    return DecorativeConeRep::downcast(*rep).getHeight();
+};
+const Real& DecorativeCone::getBaseRadius() const{
+    return DecorativeConeRep::downcast(*rep).getBaseRadius();
+};
+
+
+DecorativeCone& DecorativeCone::setOrigin(const Vec3& origin) {
+    DecorativeConeRep::downcast(*rep).setOrigin(origin); return *this;
+}
+
+DecorativeCone& DecorativeCone::setDirection(const UnitVec3& direction) {
+    DecorativeConeRep::downcast(*rep).setDirection(direction); return *this;
+}
+
+DecorativeCone& DecorativeCone::setHeight(Real height) {
+    DecorativeConeRep::downcast(*rep).setHeight(height); return *this;
+}
+
+DecorativeCone& DecorativeCone::setBaseRadius(Real baseR) {
+    DecorativeConeRep::downcast(*rep).setBaseRadius(baseR); return *this;
 }
 
 

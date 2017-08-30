@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2010-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2010-14 Stanford University and the Authors.        *
  * Authors: Peter Eastman, Michael Sherman                                    *
  * Contributors:                                                              *
  *                                                                            *
@@ -22,6 +22,7 @@
  * -------------------------------------------------------------------------- */
 
 #include "simbody/internal/common.h"
+#include "simbody/internal/MobilizedBody.h"
 #include "simbody/internal/MultibodySystem.h"
 #include "simbody/internal/SimbodyMatterSubsystem.h"
 #include "simbody/internal/Visualizer.h"
@@ -143,8 +144,13 @@ public:
         pthread_cond_destroy(&m_queueNotFull);
         pthread_mutex_destroy(&m_queueLock);
 
-        if (m_shutdownWhenDestructed)
-            m_protocol.shutdownGUI();
+        if (m_shutdownWhenDestructed) {
+            try {
+                // This throws an exception if the pipe is broken (e.g., if the
+                // simbody-visualizer has already been shut down).
+                m_protocol.shutdownGUI();
+            } catch (...) {}
+        }
     }
 
     void setShutdownWhenDestructed(bool shouldShutdown)
@@ -933,7 +939,8 @@ Visualizer& Visualizer::setGroundHeight(Real height) {
 Real Visualizer::getGroundHeight() const
 {   return getImpl().m_groundHeight; }
 
-void Visualizer::setMode(Visualizer::Mode mode) {updImpl().setMode(mode);}
+Visualizer& Visualizer::setMode(Visualizer::Mode mode) 
+{   updImpl().setMode(mode); return *this; }
 Visualizer::Mode Visualizer::getMode() const {return getImpl().m_mode;}
 
 Visualizer& Visualizer::setDesiredFrameRate(Real fps) 
@@ -1104,6 +1111,47 @@ const Array_<Visualizer::InputListener*>& Visualizer::getInputListeners() const
 const Array_<Visualizer::FrameController*>& Visualizer::getFrameControllers() const
 {   return getImpl().m_controllers; }
 const MultibodySystem& Visualizer::getSystem() const {return getImpl().m_system;}
+
+
+//==============================================================================
+//                             BODY FOLLOWER
+//==============================================================================
+Visualizer::BodyFollower::BodyFollower(
+        const MobilizedBody& mobodB,
+        const Vec3&          stationPinB,
+        const Vec3&          offset,
+        const UnitVec3&      upDirection)
+    :   m_mobodB(mobodB), m_stationPinB(stationPinB), m_offset(offset),
+        m_upDirection(upDirection) {}
+    
+void Visualizer::BodyFollower::generateControls(
+        const Visualizer&             viz,
+        const State&                  state,
+        Array_< DecorativeGeometry >& geometry)
+{
+    // Offset.
+    Vec3 offset(m_offset);
+    if (m_offset.isNaN()) {
+        // Default: offset is based on system up direction and ground height.
+        offset = Vec3(1, 1, 1);
+        offset[viz.getSystemUpDirection().getAxis()] += viz.getGroundHeight();
+    }
+
+    // Up direction. Default: use System up direction.
+    const UnitVec3& upDirection = m_upDirection.isNaN() ?
+        UnitVec3(viz.getSystemUpDirection()) : m_upDirection;
+
+    const Vec3 P = m_mobodB.findStationLocationInGround(state, m_stationPinB);
+    // Position of camera (C) from ground origin (G), expressed in ground.
+    const Vec3 p_GC = P + offset;
+    // Rotation of camera frame (C) in ground frame (G).
+    // To get the camera to point at P, we require the camera's z direction
+    // (which points "back") to be parallel to the offset. We also want the
+    // camera's y direction (which points to the top of the screen) to be as
+    // closely aligned with the provided up direction as is possible.
+    const Rotation R_GC(UnitVec3(offset), ZAxis, upDirection, YAxis);
+    viz.setCameraTransform(Transform(R_GC, p_GC));
+}
 
 
 //==============================================================================

@@ -42,7 +42,7 @@ class MyForceImpl : public Force::Custom::Implementation {
 public:
     MyForceImpl() {}
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, 
-                   Vector& mobilityForces) const 
+                   Vector& mobilityForces) const override 
     {
         SimTK_TEST( f.size() == 0 || f.size() == mobilityForces.size() );
         SimTK_TEST( F.size() == 0 || F.size() == bodyForces.size() );
@@ -51,7 +51,7 @@ public:
         if (F.size())
             bodyForces += F;
     }
-    Real calcPotentialEnergy(const State&) const {return 0;}
+    Real calcPotentialEnergy(const State&) const override {return 0;}
 
     void setMobilityForces(const Vector& mobFrc) {
         f = mobFrc;
@@ -524,6 +524,13 @@ void makeSystem(bool constrained, MultibodySystem& mbs, MyForceImpl*& frcp) {
                     pendulumBody,
                         Transform(Rotation(randomAngle2, randomVecs[6]),
                                   randomVecs[5]));
+    MobilizedBody::Slider
+        pendBody2x( pendBody2b,
+                        Transform(Rotation(randomAngle1, randomVecs[6]),
+                                  randomVecs[7]),
+                    pendulumBody,
+                        Transform(Rotation(randomAngle2, randomVecs[8]),
+                                  randomVecs[9]));
 
     MobilizedBody::Planar
         pendBody4a( pendBody4,
@@ -818,6 +825,30 @@ void testUnconstrainedSystem() {
 
     SimTK_TEST_EQ_TOL(residualForces2, residualForces1, Slop);
 
+    // We just calculated f_residual = M udot + f_inertial - f_applied, with
+    // both udot and f_applied zero, i.e. f_residual=f_inertial. That should
+    // be the same as what is returned by getTotalCentrifugalForces().
+    Vector_<SpatialVec> F_inertial(nb);
+    Vector f_inertial;
+    for (MobodIndex i(0); i<nb; ++i)
+        F_inertial[i] = matter.getTotalCentrifugalForces(state, i);
+    matter.multiplyBySystemJacobianTranspose(state, F_inertial, f_inertial);
+    SimTK_TEST_EQ_TOL(f_inertial, residualForces1, Slop);
+
+    // This should also match total Mass*Coriolis acceleration + gyro force.
+    Vector_<SpatialVec> F_coriolis(nb), F_gyro(nb), F_total(nb);
+    Vector f_total;
+    for (MobodIndex i(0); i<nb; ++i) {
+        if (i==0) F_coriolis[i] = SpatialVec(Vec3(0),Vec3(0));
+        else
+            F_coriolis[i] = matter.getMobilizedBody(i)
+                           .getBodySpatialInertiaInGround(state) * AC_GB[i];
+        F_gyro[i] = matter.getGyroscopicForce(state, i);
+    }
+
+    F_total = F_coriolis + F_gyro;
+    SimTK_TEST_EQ_TOL(F_inertial, F_total, Slop);
+
     // Same, but leave out combinations of arguments.
     matter.calcResidualForceIgnoringConstraints(state,
         0*mobilityForces, bodyForces, knownUdots, residualForces1);
@@ -951,23 +982,26 @@ void testConstrainedSystem() {
 
 
 
-void testCompositeInertia() {
+void testCompositeBodyInertia() {
     MultibodySystem         mbs;
     SimbodyMatterSubsystem  pend(mbs);
 
-    Body::Rigid pointMass(MassProperties(3, Vec3(0), Inertia(0)));
+    // This will be a point mass but the body origin is not at the COM.
+    // That's important to make sure the rigid body shifts are working right.
+    Body::Rigid pointMass(MassProperties(3, Vec3(3,0,0), UnitInertia(0,9,9)));
 
-    // Point mass at x=1.5 rotating about (0,0,0).
+    // Point mass at x=4.5 with origin at x=1.5 rotating about (0,0,0).
     MobilizedBody::Pin
         body1( pend.Ground(), Transform(), 
-               pointMass, Vec3(1.5,0,0));
+               pointMass, Vec3(-1.5,0,0));
     const MobilizedBodyIndex body1x = body1.getMobilizedBodyIndex();
 
     // A second body 2 units further along x, rotating about the
-    // first point mass origin.
+    // first point mass origin. So this one's origin is at x=3.5 and its
+    // mass is at x=6.5.
     MobilizedBody::Pin
         body2( body1, Transform(), 
-               pointMass, Vec3(2,0,0));
+               pointMass, Vec3(-2,0,0));
     const MobilizedBodyIndex body2x = body2.getMobilizedBodyIndex();
 
     State state = mbs.realizeTopology();
@@ -977,9 +1011,9 @@ void testCompositeInertia() {
     pend.calcCompositeBodyInertias(state, R);
 
     // Calculate expected inertias about the joint axes.
-    Real expInertia2 = body2.getBodyMassProperties(state).getMass()*square(2);
-    Real expInertia1 = body1.getBodyMassProperties(state).getMass()*square(1.5)
-                           + body2.getBodyMassProperties(state).getMass()*square(3.5);
+    Real expInertia2 = body2.getBodyMassProperties(state).getMass()*square(2+3);
+    Real expInertia1 = body1.getBodyMassProperties(state).getMass()*square(1.5+3)
+                           + body2.getBodyMassProperties(state).getMass()*square(3.5+3);
 
     // Should be able to recover these inertias by projecting the composite
     // body inertias onto the joint axes using H matrices.
@@ -992,18 +1026,124 @@ void testCompositeInertia() {
     SpatialInertia cbi = pend.getCompositeBodyInertia(state, body1);
 
     body2.setAngle(state, Pi/4);
-    // This is not allowed until Position stage.
+    // This is not allowed until PositionKinematics stage.
     SimTK_TEST_MUST_THROW(pend.getCompositeBodyInertia(state, body1));
     mbs.realize(state, Stage::Position);
     // Now it should be OK.
     cbi = pend.getCompositeBodyInertia(state, body1);
 
-    mbs.realize(state, Stage::Acceleration);
-    //cout << "udots=" << state.getUDot() << endl;
+    body2.setAngle(state, Pi/5);
+    pend.realizePositionKinematics(state);
+    SimTK_TEST(state.getSystemStage() == Stage::Time);
+    SimTK_TEST(!pend.isCompositeBodyInertiasRealized(state));
+    pend.realizeCompositeBodyInertias(state);
+    SimTK_TEST(pend.isCompositeBodyInertiasRealized(state));
+    pend.invalidateCompositeBodyInertias(state);
+    SimTK_TEST(!pend.isCompositeBodyInertiasRealized(state));
+}
 
-    body1.setRate(state, 27);
+// Currently just testing validity/invalidation, not correctness.
+void testArticulatedBodyInertia() {
+    MultibodySystem mbs;
+    MyForceImpl* frcp;
+    makeSystem(true, mbs, frcp);
+    const SimbodyMatterSubsystem& matter = mbs.getMatterSubsystem();
+
+    const MobodIndex body1(1), body2(2);
+
+
+    State state = mbs.realizeTopology();
+    mbs.realize(state, Stage::Position);
+
+    // This should force realization of the articulated body inertias.
+    ArticulatedInertia abi = matter.getArticulatedBodyInertia(state, body1);
+    SimTK_TEST(matter.isArticulatedBodyInertiasRealized(state));
+    matter.invalidateArticulatedBodyInertias(state);
+    SimTK_TEST(!matter.isArticulatedBodyInertiasRealized(state));
+    matter.realizeArticulatedBodyInertias(state);
+    SimTK_TEST(matter.isArticulatedBodyInertiasRealized(state));
+
+    state.updQ()=0.1; 
+    SimTK_TEST(state.getSystemStage()==Stage::Time);
+    SimTK_TEST(!matter.isArticulatedBodyInertiasRealized(state));
+    // This is not allowed until PositionKinematics stage.
+    SimTK_TEST_MUST_THROW(matter.getArticulatedBodyInertia(state, body2));
+    mbs.realize(state, Stage::Position);
+    // Now it should be OK.
+    abi = matter.getArticulatedBodyInertia(state, body1);
+
+    matter.invalidatePositionKinematics(state); // a prerequisite
+    SimTK_TEST(!matter.isArticulatedBodyInertiasRealized(state));
+    matter.realizePositionKinematics(state);
+    matter.getArticulatedBodyInertia(state, body2); // ok; implicit realization
+    SimTK_TEST(matter.isArticulatedBodyInertiasRealized(state));
+    SimTK_TEST(state.getSystemStage()==Stage::Time);
+    state.updQ()=0.2; 
+    SimTK_TEST(!matter.isArticulatedBodyInertiasRealized(state));
+
+    mbs.realize(state, Stage::Dynamics); // not high enough
+    SimTK_TEST(!matter.isArticulatedBodyInertiasRealized(state));
+
+    mbs.realize(state, Stage::Acceleration); // implicit realization of abis
+    SimTK_TEST(matter.isArticulatedBodyInertiasRealized(state));
+
+    state.updTime()=1.; // shouldn't affect time-independent stuff
+    SimTK_TEST(state.getSystemStage()==Stage::Instance);
+    SimTK_TEST(matter.isPositionKinematicsRealized(state));
+    SimTK_TEST(matter.isArticulatedBodyInertiasRealized(state));
+}
+
+// Currently just testing validity/invalidation, not correctness.
+void testArticulatedBodyVelocity() {
+    MultibodySystem mbs;
+    MyForceImpl* frcp;
+    makeSystem(true, mbs, frcp);
+    const SimbodyMatterSubsystem& matter = mbs.getMatterSubsystem();
+
+    const MobodIndex body1(1), body2(2);
+
+
+    State state = mbs.realizeTopology();
+    mbs.realize(state, Stage::Position);
+
+    // Neither ABIs nor VelocityKinematics valid.
+    SimTK_TEST_MUST_THROW(matter.realizeArticulatedBodyVelocity(state));
+
+    mbs.realize(state, Stage::Velocity);
+    // ABIs still not valid.
+    SimTK_TEST_MUST_THROW(matter.realizeArticulatedBodyVelocity(state));
+
+    matter.realizeArticulatedBodyInertias(state);
+    matter.realizeArticulatedBodyVelocity(state); // OK now
+
+    state.updU()=0.1; // invalidates VelocityKinematics
+    SimTK_TEST(state.getSystemStage()==Stage::Position);
+    SimTK_TEST(!matter.isArticulatedBodyVelocityRealized(state));
+
+    mbs.realize(state, Stage::Dynamics); // not enough
+    SimTK_TEST(!matter.isArticulatedBodyVelocityRealized(state));
+
+    mbs.realize(state, Stage::Acceleration); // that should do it!
+    SimTK_TEST(matter.isArticulatedBodyVelocityRealized(state));
+
+    matter.invalidateArticulatedBodyInertias(state); // a prerequisite
+    SimTK_TEST(!matter.isArticulatedBodyVelocityRealized(state));
+
     mbs.realize(state, Stage::Acceleration);
-    //cout << "udots=" << state.getUDot() << endl;
+    SimTK_TEST(matter.isArticulatedBodyVelocityRealized(state));
+
+    matter.invalidateVelocityKinematics(state); // another prerequisite
+    SimTK_TEST(!matter.isArticulatedBodyVelocityRealized(state));
+
+    mbs.realize(state, Stage::Acceleration);
+    SimTK_TEST(matter.isArticulatedBodyVelocityRealized(state));
+
+    state.updTime()=1.; // shouldn't affect time-independent stuff
+    SimTK_TEST(state.getSystemStage()==Stage::Instance);
+    SimTK_TEST(matter.isPositionKinematicsRealized(state));
+    SimTK_TEST(matter.isVelocityKinematicsRealized(state));
+    SimTK_TEST(matter.isArticulatedBodyInertiasRealized(state));
+    SimTK_TEST(matter.isArticulatedBodyVelocityRealized(state));
 }
 
 void testTaskJacobians() {
@@ -1204,11 +1344,155 @@ void testTaskJacobians() {
     SimTK_TEST_EQ_TOL(JFmat2, JFmat, SignificantReal);
 }
 
+// Position kinematics should be valid if:
+// - realize(Position) has been done
+// - or, realize(Instance) + realizePositionKinematics()
+// It should be invalidated when:
+// - any q changes
+// - Instance stage changes
+// It should *not* be invalidated when:
+// - time changes
+void testPositionKinematics() {
+    MultibodySystem system;
+    MyForceImpl* frcp;
+    makeSystem(true, system, frcp);
+    const SimbodyMatterSubsystem& matter = system.getMatterSubsystem();
+
+    State state = system.realizeTopology();
+    const int nq = state.getNQ();
+    const int nu = state.getNU();
+    const int nb = matter.getNumBodies();
+
+    system.realizeModel(state);
+    // Randomize state.
+    state.updQ() = Test::randVector(nq);
+
+    SimTK_TEST(state.getSystemStage() == Stage::Model);
+    Vec3 syscom;
+    SimTK_TEST_MUST_THROW // stage is too low
+       (syscom = matter.calcSystemMassCenterLocationInGround(state));
+    system.realize(state, Stage::Instance);
+    SimTK_TEST_MUST_THROW // Instance alone is not enough
+       (syscom = matter.calcSystemMassCenterLocationInGround(state));
+    matter.realizePositionKinematics(state);
+    syscom = matter.calcSystemMassCenterLocationInGround(state); // OK
+    matter.invalidatePositionKinematics(state);
+    SimTK_TEST_MUST_THROW // No good again
+       (syscom = matter.calcSystemMassCenterLocationInGround(state));
+    system.realize(state, Stage::Position);
+    syscom = matter.calcSystemMassCenterLocationInGround(state); // OK
+
+    state.setTime(1.); // should not invalidate position kinematics
+    SimTK_TEST(state.getSystemStage() == Stage::Instance);
+    syscom = matter.calcSystemMassCenterLocationInGround(state); // OK
+    cout << "System COM=" << syscom << endl;
+
+    state.updQ() = Test::randVector(nq); // should invalide position kinematics
+    SimTK_TEST(state.getSystemStage() == Stage::Instance);
+    SimTK_TEST_MUST_THROW // Not up to date with q's
+       (syscom = matter.calcSystemMassCenterLocationInGround(state));
+    matter.realizePositionKinematics(state);
+    syscom = matter.calcSystemMassCenterLocationInGround(state); // OK
+
+    state.invalidateAllCacheAtOrAbove(Stage::Instance);
+    SimTK_TEST(state.getSystemStage() == Stage::Model);
+    SimTK_TEST_MUST_THROW // stage too low again
+       (syscom = matter.calcSystemMassCenterLocationInGround(state));
+
+}
+
+// Velocity kinematics should be valid if:
+// - realize(Velocity) has been done
+// - or, position kinematics is valid and realizeVelocityKinematics() has
+//   been called (and that implies that Instance stage has been realized)
+// It should be invalidated when:
+// - any q or u changes
+// - position kinematics changes
+// - Instance stage changes
+// It should *not* be invalidated when:
+// - time changes
+void testVelocityKinematics() {
+    MultibodySystem system;
+    MyForceImpl* frcp;
+    makeSystem(true, system, frcp);
+    const SimbodyMatterSubsystem& matter = system.getMatterSubsystem();
+
+    State state = system.realizeTopology();
+    const int nq = state.getNQ();
+    const int nu = state.getNU();
+    const int nb = matter.getNumBodies();
+
+    system.realizeModel(state);
+    // Randomize state.
+    state.updQ() = Test::randVector(nq);
+    state.updU() = Test::randVector(nu);
+
+    SimTK_TEST(state.getSystemStage() == Stage::Model);
+    Vec3 syscomv;
+    SimTK_TEST_MUST_THROW // stage is too low
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    system.realize(state, Stage::Instance);
+    SimTK_TEST_MUST_THROW // Instance alone is not enough
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    matter.realizePositionKinematics(state);
+    SimTK_TEST_MUST_THROW // Instance + pos kinematics is not enough
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    matter.realizeVelocityKinematics(state);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+
+    matter.invalidateVelocityKinematics(state);
+    SimTK_TEST_MUST_THROW // No good again
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    matter.realizeVelocityKinematics(state);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+
+    matter.invalidatePositionKinematics(state);
+    SimTK_TEST_MUST_THROW // No good again
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    system.realize(state, Stage::Velocity);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+
+    state.setTime(1.); // should not invalidate velocity kinematics
+    SimTK_TEST(state.getSystemStage() == Stage::Instance);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+    cout << "System COM vel=" << syscomv << endl;
+
+    state.updU() = Test::randVector(nu); // should invalide velocity kinematics
+    SimTK_TEST(state.getSystemStage() == Stage::Instance);
+    SimTK_TEST_MUST_THROW // Not up to date with u's
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    matter.realizeVelocityKinematics(state);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+    
+    state.updQ() = Test::randVector(nq); // invalides position kinematics
+    SimTK_TEST_MUST_THROW // Pos kinematics no good
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    matter.realizePositionKinematics(state);
+    SimTK_TEST_MUST_THROW // Still not enough; need to recalc vel kinematics
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    matter.realizeVelocityKinematics(state);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+
+    state.invalidateAllCacheAtOrAbove(Stage::Instance);
+    SimTK_TEST(state.getSystemStage() == Stage::Model);
+    SimTK_TEST_MUST_THROW // stage too low again
+       (syscomv = matter.calcSystemMassCenterVelocityInGround(state));
+    // Fails because realizePositionKinematics() or realize(Position) needed.
+    SimTK_TEST_MUST_THROW(matter.realizeVelocityKinematics(state));
+    system.realize(state, Stage::Position);
+    matter.realizeVelocityKinematics(state);
+    syscomv = matter.calcSystemMassCenterVelocityInGround(state); // OK
+}
+
 int main() {
     SimTK_START_TEST("TestMassMatrix");
+        SimTK_SUBTEST(testPositionKinematics);
+        SimTK_SUBTEST(testVelocityKinematics);
         SimTK_SUBTEST(testRel2Cart);
         SimTK_SUBTEST(testJacobianBiasTerms);
-        SimTK_SUBTEST(testCompositeInertia);
+        SimTK_SUBTEST(testCompositeBodyInertia);
+        SimTK_SUBTEST(testArticulatedBodyInertia);
+        SimTK_SUBTEST(testArticulatedBodyVelocity);
         SimTK_SUBTEST(testUnconstrainedSystem);
         SimTK_SUBTEST(testConstrainedSystem);
         SimTK_SUBTEST(testTaskJacobians);

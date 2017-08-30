@@ -238,16 +238,16 @@ extern "C" {
  * time it is called.
  *
  * A CPRhsFn should return 0 if successful, a negative value if
- * an unrecoverable error occured, and a positive value if a 
- * recoverable error (e.g. invalid y values) occured. 
- * If an unrecoverable occured, the integration is halted. 
- * If a recoverable error occured, then (in most cases) CPODES
+ * an unrecoverable error occurred, and a positive value if a 
+ * recoverable error (e.g. invalid y values) occurred. 
+ * If an unrecoverable occurred, the integration is halted. 
+ * If a recoverable error occurred, then (in most cases) CPODES
  * will try to correct and retry.
  * -----------------------------------------------------------------
  */
 
 typedef int (*CPRhsFn)(realtype t, N_Vector y,
-		       N_Vector fout, void *f_data);
+               N_Vector fout, void *f_data);
 
 /*
  * ----------------------------------------------------------------
@@ -266,16 +266,16 @@ typedef int (*CPRhsFn)(realtype t, N_Vector y,
  * every time it is called.
  *                                                                
  * A CPResFn function should return a value of 0 if successful, a 
- * positive value if a recoverable error occured (e.g. y has an 
+ * positive value if a recoverable error occurred (e.g. y has an 
  * illegal value), or a negative value if a nonrecoverable error 
- * occured. In the latter case, the program halts. If a recoverable 
- * error occured, then (in most cases) the integrator will attempt 
+ * occurred. In the latter case, the program halts. If a recoverable 
+ * error occurred, then (in most cases) the integrator will attempt 
  * to correct and retry.
  * ----------------------------------------------------------------
  */
 
 typedef int (*CPResFn)(realtype t, N_Vector y, N_Vector yp,
-		       N_Vector fout, void *f_data);
+               N_Vector fout, void *f_data);
 
 /*
  * -----------------------------------------------------------------
@@ -294,16 +294,16 @@ typedef int (*CPResFn)(realtype t, N_Vector y, N_Vector yp,
  * every time it is called.
  *
  * A CPCnstrFn should return 0 if successful, a negative value if
- * an unrecoverable error occured, and a positive value if a 
- * recoverable error (e.g. invalid y values) occured. 
- * If an unrecoverable occured, the integration is halted. 
- * If a recoverable error occured, then (in most cases) CPODES
+ * an unrecoverable error occurred, and a positive value if a 
+ * recoverable error (e.g. invalid y values) occurred. 
+ * If an unrecoverable occurred, the integration is halted. 
+ * If a recoverable error occurred, then (in most cases) CPODES
  * will try to correct and retry.
  * -----------------------------------------------------------------
  */
 
 typedef int (*CPCnstrFn)(realtype t, N_Vector y,
-			 N_Vector cout, void *c_data);
+             N_Vector cout, void *c_data);
 
 /*
  * -----------------------------------------------------------------
@@ -336,10 +336,10 @@ typedef int (*CPCnstrFn)(realtype t, N_Vector y,
  * the computation of consistent initial conditions).
  *
  * A CPProjFn should return 0 if successful, a negative value if
- * an unrecoverable error occured, and a positive value if a 
- * recoverable error (e.g. invalid y values) occured. 
- * If an unrecoverable occured, the integration is halted. 
- * If a recoverable error occured, then (in most cases) CPODES
+ * an unrecoverable error occurred, and a positive value if a 
+ * recoverable error (e.g. invalid y values) occurred. 
+ * If an unrecoverable occurred, the integration is halted. 
+ * If a recoverable error occurred, then (in most cases) CPODES
  * will try to correct and retry.
  * -----------------------------------------------------------------
  * NOTE: If the user's projection routine needs other quantities,   
@@ -351,7 +351,7 @@ typedef int (*CPCnstrFn)(realtype t, N_Vector y,
  */
 
 typedef int (*CPProjFn)(realtype t, N_Vector ycur, N_Vector corr,
-			realtype epsProj, N_Vector err, void *pdata);
+            realtype epsProj, N_Vector err, void *pdata);
 
 /*
  * -----------------------------------------------------------------
@@ -367,16 +367,16 @@ typedef int (*CPProjFn)(realtype t, N_Vector ycur, N_Vector corr,
  * passed to the qfun function every time it is called.
  *
  * A CPQuadFn should return 0 if successful, a negative value if
- * an unrecoverable error occured, and a positive value if a 
- * recoverable error (e.g. invalid y values) occured. 
- * If an unrecoverable occured, the integration is halted. 
- * If a recoverable error occured, then (in most cases) CPODES
+ * an unrecoverable error occurred, and a positive value if a 
+ * recoverable error (e.g. invalid y values) occurred. 
+ * If an unrecoverable occurred, the integration is halted. 
+ * If a recoverable error occurred, then (in most cases) CPODES
  * will try to correct and retry.
  * -----------------------------------------------------------------
  */
 
 typedef int (*CPQuadFn)(realtype t, N_Vector y, 
-			N_Vector qout, void *q_data);
+            N_Vector qout, void *q_data);
 
 /*
  * -----------------------------------------------------------------
@@ -393,12 +393,12 @@ typedef int (*CPQuadFn)(realtype t, N_Vector y,
  * passed to the user's g function every time it is called.
  *
  * A CPRootFn should return 0 if successful or a non-zero value
- * if an error occured (in which case the integration will be halted).
+ * if an error occurred (in which case the integration will be halted).
  * -----------------------------------------------------------------
  */
 
 typedef int (*CPRootFn)(realtype t, N_Vector y, N_Vector yp,
-			realtype *gout, void *g_data);
+            realtype *gout, void *g_data);
 
 /*
  * -----------------------------------------------------------------
@@ -443,8 +443,8 @@ typedef int (*CPEwtFn)(N_Vector y, N_Vector ewt, void *e_data);
  */
 
 typedef void (*CPErrHandlerFn)(int error_code, 
-			       const char *module, const char *function, 
-			       char *msg, void *eh_data); 
+                   const char *module, const char *function, 
+                   char *msg, void *eh_data); 
 
 /*
  * =================================================================
@@ -534,9 +534,9 @@ SUNDIALS_EXPORT void *CPodeCreate(int ode_type, int lmm_type, int nls_type);
  */
 
 SUNDIALS_EXPORT int CPodeInit(void *cpode_mem, 
-			      void *fun, void *f_data,
-			      realtype t0, N_Vector y0, N_Vector yp0,
-			      int tol_type, realtype reltol, void *abstol);
+                  void *fun, void *f_data,
+                  realtype t0, N_Vector y0, N_Vector yp0,
+                  int tol_type, realtype reltol, void *abstol);
 
 /*
  * -----------------------------------------------------------------
@@ -573,9 +573,9 @@ SUNDIALS_EXPORT int CPodeInit(void *cpode_mem,
  */
 
 SUNDIALS_EXPORT int CPodeReInit(void *cpode_mem, 
-				void *fun, void *f_data,
-				realtype t0, N_Vector y0, N_Vector yp0,
-				int tol_type, realtype reltol, void *abstol);
+                void *fun, void *f_data,
+                realtype t0, N_Vector y0, N_Vector yp0,
+                int tol_type, realtype reltol, void *abstol);
 
 /*
  * -----------------------------------------------------------------
@@ -623,8 +623,8 @@ SUNDIALS_EXPORT int CPodeReInit(void *cpode_mem,
  */
 
 SUNDIALS_EXPORT int CPodeProjInit(void *cpode_mem, int proj_norm, 
-				  int cnstr_type, CPCnstrFn cfun, void *c_data, 
-				  N_Vector ctol);
+                  int cnstr_type, CPCnstrFn cfun, void *c_data, 
+                  N_Vector ctol);
 
 /*
  * -----------------------------------------------------------------
@@ -948,10 +948,10 @@ SUNDIALS_EXPORT int CPodeSetProjLsetupFreq(void *cpode_mem, long int proj_lset_f
 SUNDIALS_EXPORT int CPodeSetProjNonlinConvCoef(void *cpode_mem, realtype prjcoef);
 
 SUNDIALS_EXPORT int CPodeSetQuadErrCon(void *cpode_mem, booleantype errconQ, 
-				       int tol_typeQ, realtype reltolQ, void *abstolQ);
+                       int tol_typeQ, realtype reltolQ, void *abstolQ);
 
 SUNDIALS_EXPORT int CPodeSetTolerances(void *cpode_mem,
-				       int tol_type, realtype reltol, void *abstol);
+                       int tol_type, realtype reltol, void *abstol);
 
 SUNDIALS_EXPORT int CPodeSetRootDirection(void *cpode_mem, int *rootdir);
 
@@ -1046,7 +1046,7 @@ SUNDIALS_EXPORT int CPodeSetRootDirection(void *cpode_mem, int *rootdir);
  */
 
 SUNDIALS_EXPORT int CPode(void *cpode_mem, realtype tout, realtype *tret, 
-			  N_Vector yout, N_Vector ypout, int mode);
+              N_Vector yout, N_Vector ypout, int mode);
 
 /*
  * -----------------------------------------------------------------
@@ -1128,7 +1128,7 @@ SUNDIALS_EXPORT int CPodeGetConsistentIC(void *cpode_mem, N_Vector yy0, N_Vector
  * CPodeGetNumLinSolvSetups returns the number of calls made to
  *    the linear solver's setup routine
  * CPodeGetNumErrTestFails returns the number of local error test
- *    failures that have occured
+ *    failures that have occurred
  * CPodeGetLastOrder returns the order used during the last
  *    internal step
  * CPodeGetCurrentOrder returns the order to be used on the next
@@ -1160,7 +1160,7 @@ SUNDIALS_EXPORT int CPodeGetConsistentIC(void *cpode_mem, N_Vector yy0, N_Vector
  * CPodeGetIntegratorStats retruns most of the optional outputs as
  *    a group.
  * CPodeGet* return values:
- *   CP_SUCCESS   if succesful
+ *   CP_SUCCESS   if successful
  *   CP_MEM_NULL  if the CPODES memory was NULL
  *   CP_NO_SLDET  if stability limit was not turned on
  * -----------------------------------------------------------------
@@ -1185,10 +1185,10 @@ SUNDIALS_EXPORT int CPodeGetNumGEvals(void *cpode_mem, long int *ngevals);
 SUNDIALS_EXPORT int CPodeGetRootInfo(void *cpode_mem, int *rootsfound);
 SUNDIALS_EXPORT int CPodeGetRootWindow(void *cpode_mem, realtype *tlo, realtype *thi);
 SUNDIALS_EXPORT int CPodeGetIntegratorStats(void *cpode_mem, long int *nsteps,
-					    long int *nfevals, long int *nlinsetups,
-					    long int *netfails, int *qlast,
-					    int *qcur, realtype *hinused, realtype *hlast,
-					    realtype *hcur, realtype *tcur);
+                        long int *nfevals, long int *nlinsetups,
+                        long int *netfails, int *qlast,
+                        int *qcur, realtype *hinused, realtype *hlast,
+                        realtype *hcur, realtype *tcur);
 
 /*
  * -----------------------------------------------------------------
@@ -1209,7 +1209,7 @@ SUNDIALS_EXPORT int CPodeGetIntegratorStats(void *cpode_mem, long int *nsteps,
 SUNDIALS_EXPORT int CPodeGetNumNonlinSolvIters(void *cpode_mem, long int *nniters);
 SUNDIALS_EXPORT int CPodeGetNumNonlinSolvConvFails(void *cpode_mem, long int *nncfails);
 SUNDIALS_EXPORT int CPodeGetNonlinSolvStats(void *cpode_mem, long int *nniters,
-					    long int *nncfails);
+                        long int *nncfails);
 
   
 /*
@@ -1227,8 +1227,8 @@ SUNDIALS_EXPORT int CPodeGetProjNumCnstrEvals(void *cpode_mem, long int *nce);
 SUNDIALS_EXPORT int CPodeGetProjNumLinSolvSetups(void *cpode_mem, long int *nsetupsP);
 SUNDIALS_EXPORT int CPodeGetProjNumFailures(void *cpode_mem, long int *nprf);
 SUNDIALS_EXPORT int CPodeGetProjStats(void *cpode_mem, long int *nproj,
-				      long int *nce, long int *nsetupsP,
-				      long int *nprf);
+                      long int *nce, long int *nsetupsP,
+                      long int *nprf);
 
 /*
  * -----------------------------------------------------------------

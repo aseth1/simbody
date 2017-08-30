@@ -125,7 +125,7 @@
     // Similar checks for floating point values.
 
 #define SimTK_VALUECHECK_ALWAYS(lb,val,ub,valName,where) \
-    do{if(!(lb)<=(val)&&(val)<=(ub)))SimTK_THROW5(SimTK::Exception::ValueOutOfRange,   \
+    do{if(!((lb)<=(val)&&(val)<=(ub)))SimTK_THROW5(SimTK::Exception::ValueOutOfRange,   \
                     (valName),(lb),(val),(ub),(where));}while(false)
 
 
@@ -363,7 +363,6 @@
 // So if you want to override NDEBUG do it at the *beginning* (that is, before
 // the first #include or #ifdef) of whatever compilation unit you are fiddling with.
 #if defined(NDEBUG) && !defined(SimTK_KEEP_ASSERT)
-    #define SimTK_ASSERT(cond,msg)
     #define SimTK_ASSERT(cond,msg)
     #define SimTK_ASSERT1(cond,msg,a1)
     #define SimTK_ASSERT2(cond,msg,a1,a2)

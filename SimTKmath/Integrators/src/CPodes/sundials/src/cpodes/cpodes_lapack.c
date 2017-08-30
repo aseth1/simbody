@@ -363,10 +363,11 @@ int CPLapackBand(void *cpode_mem, int N, int mupper, int mlower)
   /* Test ml and mu for legality */
   if ((ml < 0) || (mu < 0) || (ml >= N) || (mu >= N)) {
     cpProcessError(cp_mem, CPDIRECT_ILL_INPUT, "CPLAPACK", "CPLapackBand", MSGD_BAD_SIZES);
+    free(cpdls_mem);
     return(CPDIRECT_ILL_INPUT);
   }
 
-  /* Set extended upper half-bandwith for M (required for pivoting) */
+  /* Set extended upper half-bandwidth for M (required for pivoting) */
   smu = MIN(N-1, mu + ml);
 
   /* Allocate memory for M, savedJ, and pivot arrays */

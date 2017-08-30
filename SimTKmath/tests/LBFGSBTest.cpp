@@ -40,7 +40,7 @@ class ProblemSystem : public OptimizerSystem {
 
    ProblemSystem( const int numParameters ) : OptimizerSystem( numParameters ) {}
 
-   int objectiveFunc(   const Vector &coefficients, bool new_coefficients,  Real& f  ) const  {
+   int objectiveFunc(   const Vector &coefficients, bool new_coefficients,  Real& f  ) const override  {
       int i;
 
       const Real *x = &coefficients[0];
@@ -54,7 +54,7 @@ class ProblemSystem : public OptimizerSystem {
       return( 0 ); 
    }
 
-   int gradientFunc( const Vector &coefficients, bool new_coefficients,  Vector &gradient ) const {
+   int gradientFunc( const Vector &coefficients, bool new_coefficients,  Vector &gradient ) const override {
       const Real *x;
       Real t1,t2;
       int i;
@@ -129,7 +129,7 @@ int main() {
 
 
 
-    printf("LBFGSBTests.cpp: f = %f params = ",f);
+    printf("LBFGSBTest.cpp: f = %f params = ",f);
     for( i=0; i<NUMBER_OF_PARAMETERS; i++ ) {
        printf(" %f",results[i]); 
     }
@@ -143,7 +143,7 @@ int main() {
                         1.086736, 1.180997, 1.394759, 1.945352, 3.784388 };
     for( i=0; i<NUMBER_OF_PARAMETERS; i++ ) {
        if(!equalToTol(results[i], expected[i], TOL)) {
-           printf(" LBFGSBTests.cpp: error results[%d] = %f  expected=%f \n",i,results[i], expected[i]);
+           printf(" LBFGSBTest.cpp: error results[%d] = %f  expected=%f \n",i,results[i], expected[i]);
            returnValue = 1;
        }
     }

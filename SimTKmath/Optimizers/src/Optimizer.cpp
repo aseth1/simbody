@@ -27,6 +27,7 @@
 #include "LBFGSBOptimizer.h"
 #include "InteriorPointOptimizer.h"
 #include "CFSQPOptimizer.h"
+#include "CMAESOptimizer.h"
 #include <string>
 
 namespace SimTK {
@@ -43,6 +44,7 @@ bool Optimizer::isAlgorithmAvailable(OptimizerAlgorithm algorithm) {
 #if SimTK_DEFAULT_PRECISION==2 // double only
         case CFSQP:         return CFSQPOptimizer::isAvailable();
 #endif
+        case CMAES:         return CMAESOptimizer::isAvailable();
         default:            return false;
     }
 }
@@ -94,7 +96,7 @@ Optimizer::constructOptimizerRep( const OptimizerSystem& sys, OptimizerAlgorithm
     OptimizerRep* newRep = 0;
 
     // if constructor specifies which algorithm, use it else select based on
-    // problem paramters 
+    // problem parameters 
     if ( algorithm == InteriorPoint ) {
         newRep = (OptimizerRep *) new InteriorPointOptimizer( sys  );
     } else if( algorithm == LBFGSB ) {
@@ -114,6 +116,16 @@ Optimizer::constructOptimizerRep( const OptimizerSystem& sys, OptimizerAlgorithm
         }
     }
 #endif
+    else if( algorithm == CMAES ) {
+        newRep = (OptimizerRep *) new CMAESOptimizer( sys  );
+    }
+
+    SimTK_APIARGCHECK_ALWAYS(
+            algorithm != UnknownOptimizerAlgorithm &&
+            algorithm != UserSuppliedOptimizerAlgorithm,
+            "Optimizer", "constructOptimizerRep",
+            "UnknownOptimizerAlgorithm and UserSuppliedOptimizerAlgorithm "
+            "do not specify specific algorithms.");
 
     if(!newRep) { 
         if( sys.getNumConstraints() > 0)   {
@@ -176,6 +188,10 @@ bool Optimizer::setAdvancedIntOption( const char *option, const int value ) {
 
 bool Optimizer::setAdvancedBoolOption( const char *option, const bool value ) {
     return updRep().setAdvancedBoolOption( option, value);
+}
+
+bool Optimizer::setAdvancedVectorOption( const char *option, const Vector value ) {
+    return updRep().setAdvancedVectorOption( option, value);
 }
 
 Real Optimizer::optimize(SimTK::Vector   &results) {

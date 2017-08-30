@@ -38,7 +38,7 @@ Parallel2DExecutorImpl::Parallel2DExecutorImpl(int gridSize, int numProcessors) 
         executor = new ParallelExecutor(numProcessors);
     init(numProcessors);
 }
-Parallel2DExecutorImpl::Parallel2DExecutorImpl(int gridSize, ParallelExecutor& executor) : gridSize(gridSize), ownExecutor(false), executor(&executor) {
+Parallel2DExecutorImpl::Parallel2DExecutorImpl(int gridSize, ParallelExecutor& executor) : gridSize(gridSize), executor(&executor), ownExecutor(false) {
     init(executor.getNumProcessors());
 }
 void Parallel2DExecutorImpl::init(int numProcessors) {
@@ -104,7 +104,7 @@ public:
     TriangleTask(const Parallel2DExecutorImpl& executor, Parallel2DExecutor::Task& task, Parallel2DExecutor::RangeType rangeType, int width, bool shouldInitialize, bool shouldFinish) :
         executor(executor), task(task), rangeType(rangeType), width(width), shouldInitialize(shouldInitialize), shouldFinish(shouldFinish) {
     }
-    void execute(int index) {
+    void execute(int index) override {
         int start = executor.getBinStart(width*index);
         int end = executor.getBinStart(width*(index+1));
         switch (rangeType) {
@@ -125,11 +125,11 @@ public:
             return;
         }
     }
-    void initialize() {
+    void initialize() override {
         if (shouldInitialize)
             task.initialize();
     }
-    void finish() {
+    void finish() override {
         if (shouldFinish)
             task.finish();
     }
@@ -146,7 +146,7 @@ public:
     SquareTask(const Parallel2DExecutorImpl& executor, Parallel2DExecutor::Task& task, const Array_<pair<int,int> >& squares, Parallel2DExecutor::RangeType rangeType, bool shouldInitialize, bool shouldFinish) :
         executor(executor), task(task), squares(squares), rangeType(rangeType), shouldInitialize(shouldInitialize), shouldFinish(shouldFinish) {
     }
-    void execute(int index) {
+    void execute(int index) override {
         const pair<int,int>& square = squares[index];
         int istart = executor.getBinStart(square.second+1);
         int iend = executor.getBinStart(square.second+2);
@@ -168,11 +168,11 @@ public:
             return;
         }
     }
-    void initialize() {
+    void initialize() override {
         if (shouldInitialize)
             task.initialize();
     }
-    void finish() {
+    void finish() override {
         if (shouldFinish)
             task.finish();
     }
@@ -201,7 +201,8 @@ void Parallel2DExecutorImpl::execute(Parallel2DExecutor::Task& task, Parallel2DE
     // Execute the square blocks in a series of passes.
     
     for (int i = 0; i < (int)squares.size(); ++i) {
-        SquareTask square(*this, task, squares[i], rangeType, false, i == squares.size()-1);
+        SquareTask square(*this, task, squares[i], rangeType, false, 
+                          i == (int)squares.size()-1);
         executor->execute(square, squares[i].size());
     }
 }

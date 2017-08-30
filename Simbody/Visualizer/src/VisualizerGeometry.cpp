@@ -124,7 +124,7 @@ void VisualizerGeometry::implementTextGeometry(const SimTK::DecorativeText& geom
     // The default is to face the camera.
     bool faceCamera = geom.getFaceCamera()<0 ? true : (geom.getFaceCamera()!=0);
     bool isScreenText = geom.getIsScreenText();
-    protocol.drawText(X_GD.p(), getScaleFactors(geom), getColor(geom), 
+    protocol.drawText(X_GD, getScaleFactors(geom), getColor(geom), 
                       geom.getText(), faceCamera, isScreenText);
 }
 
@@ -132,6 +132,14 @@ void VisualizerGeometry::implementMeshGeometry(const SimTK::DecorativeMesh& geom
     const Transform X_GD = calcX_GD(geom);
     protocol.drawPolygonalMesh(geom.getMesh(), X_GD, getScaleFactors(geom), 
                                getColor(geom), getRepresentation(geom));
+}
+
+
+void VisualizerGeometry::implementMeshFileGeometry(const SimTK::DecorativeMeshFile& geom) {
+    const PolygonalMesh& pMesh = geom.getMesh();
+    const Transform X_GD = calcX_GD(geom);
+    protocol.drawPolygonalMesh(pMesh, X_GD, getScaleFactors(geom),
+        getColor(geom), getRepresentation(geom));
 }
 
 Vec4 VisualizerGeometry::getColor(const DecorativeGeometry& geom,

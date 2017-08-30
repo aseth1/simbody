@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org/home/simbody.  *
  *                                                                            *
- * Portions copyright (c) 2010-12 Stanford University and the Authors.        *
+ * Portions copyright (c) 2010-14 Stanford University and the Authors.        *
  * Authors: Peter Eastman                                                     *
  * Contributors: Michael Sherman                                              *
  *                                                                            *
@@ -28,6 +28,7 @@
 #include "lodepng.h"
 
 #include <cstdlib>
+#include <cmath>
 #include <string>
 #include <algorithm>
 #include <set>
@@ -45,7 +46,9 @@
 
 // Get gl and glut using the appropriate platform-dependent incantations.
 #if defined(__APPLE__)
-    // OSX comes with a good glut implementation.
+    // OSX comes with a glut implementation. In OSX 10.9 and 10.10, this
+    // glut is deprecated and emits deprecation warnings.
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     #include <GLUT/glut.h>
 #elif defined(_WIN32)
     #include "glut32/glut.h"    // we have our own private headers
@@ -84,7 +87,7 @@
     #include <GL/glut.h>
 #endif
 
-// Returns true if we were able to find sufficent OpenGL functionality to 
+// Returns true if we were able to find sufficient OpenGL functionality to 
 // operate. We'll still limp along if we can't get enough to save images.
 static bool initGlextFuncPointersIfNeeded(bool& canSaveImages);
 static void redrawDisplay();
@@ -96,16 +99,22 @@ static void shutdown();
 #ifdef _WIN32
     #include <io.h>
     #define READ _read
+    #define WRITEFUNC _write
 #else
     #include <unistd.h>
     #define READ read
+    #define WRITEFUNC write
+#endif
+
+#ifdef _MSC_VER
+#pragma warning(disable:4996) // don't warn about strerror, sprintf, etc.
 #endif
 
 // gcc 4.4.3 complains bitterly if you don't check the return
 // status from the write() system call. This avoids those
 // warnings and maybe, someday, will catch an error.
 #define WRITE(pipeno, buf, len) \
-   {int status=write((pipeno), (buf), (len)); \
+   {int status=WRITEFUNC((pipeno), (buf), (len)); \
     SimTK_ERRCHK4_ALWAYS(status!=-1, "simbody-visualizer",  \
     "An attempt to write() %d bytes to pipe %d failed with errno=%d (%s).", \
     (len),(pipeno),errno,strerror(errno));}
@@ -277,9 +286,9 @@ private:
 
 class RenderedText {
 public:
-    RenderedText(const fVec3& position, const fVec3& scale, const fVec3& color, 
+    RenderedText(const fTransform& X_GT, const fVec3& scale, const fVec3& color, 
                  const string& text, bool faceCamera = true) 
-    :   position(position), scale(scale/119), text(text),
+    :   X_GT(X_GT), scale(scale/119), text(text),
         faceCamera(faceCamera) {
         this->color[0] = color[0];
         this->color[1] = color[1];
@@ -287,10 +296,10 @@ public:
     }
     void draw() {
         glPushMatrix();
-        glTranslated(position[0], position[1], position[2]);
-        fVec4 rot = X_GC.R().convertRotationToAngleAxis();
-        if (faceCamera)
-            glRotated(rot[0]*SimTK_RADIAN_TO_DEGREE, rot[1], rot[2], rot[3]);
+        glTranslated(X_GT.p()[0], X_GT.p()[1], X_GT.p()[2]);
+        const fVec4 rot = faceCamera ? X_GC.R().convertRotationToAngleAxis()
+                                     : X_GT.R().convertRotationToAngleAxis();
+        glRotated(rot[0]*SimTK_RADIAN_TO_DEGREE, rot[1], rot[2], rot[3]);
         glScaled(scale[0], scale[1], scale[2]);
         glColor3fv(color);
         for (int i = 0; i < (int) text.size(); i++)
@@ -298,12 +307,12 @@ public:
         glPopMatrix();
     }
     void computeBoundingSphere(float& radius, fVec3& center) const {
-        center = position;
+        center = X_GT.p();
         radius = glutStrokeLength(GLUT_STROKE_ROMAN, 
                                   (unsigned char*)text.c_str())*scale[0];
     }
 private:
-    fVec3 position;
+    fTransform X_GT;
     fVec3 scale;
     GLfloat color[3];
     string text;
@@ -471,7 +480,7 @@ public:
     PendingMesh() {
         index = nextMeshIndex++;
     }
-    void execute() {
+    void execute() override {
         if ((int) meshes.size() <= index)
             meshes.resize(index+1);
         meshes[index].push_back(new Mesh(vertices, normals, faces));
@@ -726,7 +735,7 @@ class PendingStandardMesh : public PendingCommand {
 public:
     PendingStandardMesh(unsigned short meshIndex, unsigned short resolution) : meshIndex(meshIndex), resolution(resolution) {
     }
-    void execute() {
+    void execute() override {
         if ((int) meshes[meshIndex].size() <= resolution)
             meshes[meshIndex].resize(resolution+1, NULL);
         if (meshes[meshIndex][resolution] == NULL) {
@@ -836,7 +845,7 @@ static void zoomCameraToShowWholeScene(bool sceneAlreadyLocked=false) {
 
 class PendingCameraZoom : public PendingCommand {
 public:
-    void execute() {
+    void execute() override {
         zoomCameraToShowWholeScene(true); // scene already locked
     }
 };
@@ -845,7 +854,7 @@ class PendingSetCameraTransform : public PendingCommand {
 public:
     PendingSetCameraTransform(fVec3 R, fVec3 p) : Rxyz(R), p(p) { }
 
-    void execute() {
+    void execute() override {
         X_GC.updR().setRotationToBodyFixedXYZ(Rxyz);
         X_GC.updP() = p;
     }
@@ -858,7 +867,7 @@ private:
 class PendingWindowTitleChange : public PendingCommand {
 public:
     PendingWindowTitleChange(const string& title) : title(title) {}
-    void execute() {glutSetWindowTitle(title.c_str());}
+    void execute() override {glutSetWindowTitle(title.c_str());}
 private:
     string title;
 };
@@ -867,7 +876,7 @@ private:
 class PendingBackgroundColorChange : public PendingCommand {
 public:
     PendingBackgroundColorChange(const fVec3& color) : color(color) {}
-    void execute() {
+    void execute() override {
         backgroundColor=color; setClearColorToBackgroundColor();
     }
 private:
@@ -888,7 +897,8 @@ public:
     Menu(string title, int id, const vector<pair<string, int> >& items,
          void(*handler)(int))
     :   title(title), menuId(id), items(items), handler(handler),
-        hasCreated(false) {}
+        hasCreated(false) 
+    {   glutId = -1; minx=miny=maxx=maxy= -1; }
 
     // This is called once, the first time we try to draw this menu.
     void createMenu() {
@@ -1044,6 +1054,9 @@ public:
                                       (unsigned char*) title.c_str());
         if (labelWidth > maxLabelWidth)
             maxLabelWidth = labelWidth;
+
+        minx=miny=maxx=maxy=handlex=clickOffset= -1;
+        dragging = false;
     }
 
     int draw(int y) {
@@ -1255,7 +1268,7 @@ static void drawGroundAndSky(float farClipDistance) {
                 float y = j/(float) width;
                 double line = min(min(min(x, y), 1.0f-x), 1.0f-y);
                 float noise = (rand()%255)/255.0f-0.5f;
-                groundImage[i*width+j] = pow(line,0.1)*(0.35f+noise);
+                groundImage[i*width+j] = float(std::pow(line,.1)*(.35f+noise));
             }
         }
         glTexImage2D(GL_TEXTURE_2D, 0, 1, width, width, 0, GL_RED, GL_FLOAT, groundImage);
@@ -1478,7 +1491,7 @@ static void renderScene(std::vector<std::string>* screenText = NULL) {
         const double now = realTime(); // in seconds at high resolution
         const double elapsed = now - fpsBaseTime;
         if (elapsed >= 1) {
-            fps = fpsCounter/elapsed;
+            fps = float(fpsCounter/elapsed);
             fpsBaseTime = now;
             fpsCounter = 0;
         }
@@ -1755,7 +1768,7 @@ static void mouseDragged(int x, int y) {
       || (clickButton == GLUT_LEFT_BUTTON && clickModifiers & GLUT_ACTIVE_SHIFT))
     {
         pthread_mutex_lock(&sceneLock);         //------ LOCK SCENE ----------
-        X_GC.updP() += translatePerPixel*X_GC.R()*fVec3(dx, -dy, 0);
+        X_GC.updP() += translatePerPixel*X_GC.R()*fVec3(float(dx),float(-dy),0);
         pthread_mutex_unlock(&sceneLock);       //------ UNLOCK SCENE --------
     }
 
@@ -1764,7 +1777,7 @@ static void mouseDragged(int x, int y) {
            || (clickButton == GLUT_LEFT_BUTTON && clickModifiers & GLUT_ACTIVE_ALT))
     {
         pthread_mutex_lock(&sceneLock);         //------ LOCK SCENE ----------
-        X_GC.updP() += translatePerPixel* X_GC.R()*fVec3(0, 0, dy);
+        X_GC.updP() += translatePerPixel* X_GC.R()*fVec3(0,0,float(dy));
         pthread_mutex_unlock(&sceneLock);       //------ UNLOCK SCENE --------
     }
 
@@ -1887,7 +1900,7 @@ public:
     Array_<unsigned char> data;
     SaveImageTask(const string& filename, int width, int height) : filename(filename), width(width), height(height), data(width*height*3) {
     }
-    void execute() {
+    void execute() override {
         // Flip the image vertically, since OpenGL and PNG use different row orders.
 
         const int rowLength = 3*width;
@@ -2076,11 +2089,13 @@ static Scene* readNewScene() {
         }
 
         case AddText: {
-            readData(buffer, 9*sizeof(float)+3*sizeof(short));
-            fVec3 position = fVec3(floatBuffer[0], floatBuffer[1], floatBuffer[2]);
-            fVec3 scale = fVec3(floatBuffer[3], floatBuffer[4], floatBuffer[5]);
-            fVec3 color = fVec3(floatBuffer[6], floatBuffer[7], floatBuffer[8]);
-            unsigned short* shortp = &shortBuffer[9*sizeof(float)/sizeof(short)];
+            readData(buffer, 12*sizeof(float)+3*sizeof(short));
+            fTransform X_GT;
+            X_GT.updR().setRotationToBodyFixedXYZ(fVec3(floatBuffer[0], floatBuffer[1], floatBuffer[2]));
+            X_GT.updP() = fVec3(floatBuffer[3], floatBuffer[4], floatBuffer[5]);
+            fVec3 scale = fVec3(floatBuffer[6], floatBuffer[7], floatBuffer[8]);
+            fVec3 color = fVec3(floatBuffer[9], floatBuffer[10], floatBuffer[11]);
+            unsigned short* shortp = &shortBuffer[12*sizeof(float)/sizeof(short)];
             bool faceCamera = (shortp[0] != 0);
             bool isScreenText = (shortp[1] != 0);
             short length = shortp[2];
@@ -2091,7 +2106,7 @@ static Scene* readNewScene() {
                     ScreenText(string((char*)buffer, length)));
             else
                 newScene->sceneText.push_back(
-                    RenderedText(position, scale, color, string((char*)buffer, length), faceCamera));
+                    RenderedText(X_GT, scale, color, string((char*)buffer, length), faceCamera));
             break;
         }
 
@@ -2433,7 +2448,8 @@ void* listenForInput(void* args) {
 
         default:
             SimTK_ERRCHK1_ALWAYS(!"unrecognized command", "listenForInput()",
-                "Unexpected command %u received from simbody-visualizer. Can't continue.",
+                "simbody-visualizer received unexpected command %u "
+                "from simulator. Can't continue.",
                 (unsigned)buffer[0]);
         }
 
@@ -2737,7 +2753,7 @@ int main(int argc, char** argv) {
     glutCreateWindow(title.c_str());
 
 
-    // Set up callback funtions.
+    // Set up callback functions.
     glutDisplayFunc(redrawDisplay);
     glutReshapeFunc(changeSize);
     glutMouseFunc(mouseButtonPressedOrReleased);

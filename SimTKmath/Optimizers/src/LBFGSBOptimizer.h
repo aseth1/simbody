@@ -1,5 +1,5 @@
-#ifndef _SimTK_LBFGSB_OPTIMIZER_H_
-#define _SimTK_LBFGSB_OPTIMIZER_H_
+#ifndef SimTK_SIMMATH_LBFGSB_OPTIMIZER_H_
+#define SimTK_SIMMATH_LBFGSB_OPTIMIZER_H_
 
 /* -------------------------------------------------------------------------- *
  *                        Simbody(tm): SimTKmath                              *
@@ -37,10 +37,10 @@ public:
 
     LBFGSBOptimizer(const OptimizerSystem& sys); 
 
-    Real optimize(  Vector &results );
-    OptimizerRep* clone() const;
+    Real optimize(  Vector &results ) override;
+    OptimizerRep* clone() const override;
 
-    OptimizerAlgorithm getAlgorithm() const
+    OptimizerAlgorithm getAlgorithm() const override
     {   return LBFGSB; }
 
     int setulb_(int *n, int *m, Real *x, Real *l,
@@ -56,5 +56,6 @@ private:
 };
 
 } // namespace SimTK
-#endif //_SimTK_LBFGSB_OPTIMIZER_H_
+
+#endif // SimTK_SIMMATH_LBFGSB_OPTIMIZER_H_
 

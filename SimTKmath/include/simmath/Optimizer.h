@@ -31,12 +31,36 @@
 
 namespace SimTK {
 
+/**
+ * The available Optimizer algorithms.
+ * Gradient descent algorithms seek to find a local minimum, and are not
+ * guaranteed to find the global minimum. See the description of Optimizer for
+ * specific information about how to use the algorithms.
+ */
 enum OptimizerAlgorithm {
-     BestAvailable  = 0, // Simmath will select best Optimizer based on problem type
-     InteriorPoint  = 1, // IPOPT interior point optimizer
-     LBFGS          = 2, // LBFGS optimizer
-     LBFGSB         = 3, // LBFGS optimizer with simple bounds
-     CFSQP          = 4  // CFSQP sequential quadratic programming optimizer (requires external library)
+     /// Simmath will select best Optimizer based on problem type.
+     BestAvailable = 0,
+     /// IpOpt algorithm (https://projects.coin-or.org/ipopt);
+     /// gradient descent.
+     InteriorPoint = 1,
+     /// Limited-memory Broyden-Fletcher-Goldfarb-Shanno algorithm; 
+     /// gradient descent.
+     LBFGS         = 2,
+     /// LBFGS with simple bound constraints;
+     /// gradient descent.
+     LBFGSB        = 3,
+     /// C implementation of sequential quadratic programming
+     /// (requires external library:
+     /// ftp://frcatel.fri.uniza.sk/pub/soft/math/matprog/doc/fsqp.html);
+     /// gradient descent.
+     CFSQP         = 4,
+     /// Covariance matrix adaptation, evolution strategy
+     /// (https://github.com/cma-es/c-cmaes);
+     /// this is a randomized algorithm that attempts to find a global minimum.
+     CMAES         = 5,
+     UnknownOptimizerAlgorithm = 6, // the default impl. of getAlgorithm.
+     /// An algorithm that is implemented outside of Simmath.
+     UserSuppliedOptimizerAlgorithm = 7
 };
 
 /**
@@ -69,6 +93,7 @@ public:
     }
 
     /// Objective/cost function which is to be optimized; return 0 when successful.
+    /// The value of f upon entry into the function is undefined.
     /// This method must be supplied by concrete class.
     virtual int objectiveFunc      ( const Vector& parameters, 
                                  bool new_parameters, Real& f ) const {
@@ -150,15 +175,15 @@ public:
            numLinearInequalityConstraints = n;
        }
    }
-   /// Set the upper and lower bounds on the paramters.
+   /// Set the upper and lower bounds on the parameters.
    void setParameterLimits( const Vector& lower, const Vector& upper  ) {
        if(   upper.size() != numParameters  && upper.size() != 0) {
-           const char* where = " OptimizerSystem  setParamtersLimits";
+           const char* where = " OptimizerSystem  setParametersLimits";
            const char* szName = "upper limits length";
            SimTK_THROW5(Exception::IncorrectArrayLength, szName, upper.size(), "numParameters", numParameters, where);
        }
        if(   lower.size() != numParameters  && lower.size() != 0 ) {
-           const char* where = " OptimizerSystem  setParamtersLimits";
+           const char* where = " OptimizerSystem  setParametersLimits";
            const char* szName = "lower limits length";
            SimTK_THROW5(Exception::IncorrectArrayLength, szName, lower.size(), "numParameters", numParameters, where);
        } 
@@ -220,23 +245,178 @@ private:
 
 /**
  * API for SimTK Simmath's optimizers.
- * An optimizer finds a local minimum to an objective function. The
- * optimizer can be constrained to search for a minimum within a feasible 
- * region. The feasible region can be defined by setting limits on the 
- * parameters of the objective function and/or supplying constraint 
- * functions that must be satisfied. 
- * The optimizer starts searching for a minimum beginning at a user supplied 
+ * An optimizer finds a minimum to an objective function. Usually, this minimum
+ * is a local minimum. Some algorithms, like CMAES, are designed to find the
+ * global minumum. The optimizer can be constrained to search for a minimum
+ * within a feasible region. The feasible region is defined in two ways: via
+ * limits on the parameters of the objective function; and, for algorithms
+ * other than CMAES, by supplying constraint functions that must be satisfied.
+ * The optimizer starts searching for a minimum beginning at a user supplied
  * initial value for the set of parameters.
  *
  * The objective function and constraints are specified by supplying the
  * Optimizer with a concrete implemenation of an OptimizerSystem class.
- * The OptimizerSystem can be passed to the Optimizer either through the 
- * Optimizer constructor or by calling the setOptimizerSystem method.  
- * The Optimizer class will select the best optimization algorithm to solve the
- * problem based on the constraints supplied by the OptimizerSystem. 
+ * The OptimizerSystem can be passed to the Optimizer either through the
+ * Optimizer constructor or by calling the Optimizer::setOptimizerSystem
+ * method.  The Optimizer class will select the best optimization algorithm to
+ * solve the problem based on the constraints supplied by the OptimizerSystem.
  * A user can also override the optimization algorithm selected by the
- * Optimizer by specifying the optimization algorithm. 
- *  
+ * Optimizer by specifying the optimization algorithm.
+ *
+ * <h3> Optimization algorithms and advanced options </h3>
+ *
+ * See OptimizerAlgorithm for a brief description of the available algorithms.
+ * Most of these algorithms have options that are specific to the algorithm.
+ * These options are set via methods like Optimizer::setAdvancedStrOption. If
+ * you want to get going quickly, you can just use the default values of these
+ * options and ignore this section. As an example, an int option
+ * <b>popsize</b> would be set via:
+ *
+ * @code
+ * opt.setAdvancedIntOption("popsize", 5);
+ * @endcode
+ *
+ * For now, we only have detailed documentation for the CMAES algorithm.
+ *
+ * <h4> CMAES </h4>
+ *
+ * This is the c-cmaes algorithm written by Niko Hansen
+ * (https://github.com/cma-es/c-cmaes).
+ *
+ * Some notes:
+ * - This algorithm obeys parameter limits.
+ * - This is a derivative-free optimization algorithm, so methods like the
+ *   following have no effect:
+ *      - Optimizer::useNumericalGradient
+ *      - Optimizer::setDifferentiatorMethod
+ *      - Optimizer::setLimitedMemoryHistory
+ *      - OptimizerSystem::gradientFunc
+ *      - OptimizerSystem::hessian
+ * - This algorithm does not obey constraint functions, so methods like the
+ *   following have no effect:
+ *      - Optimizer::setConstraintTolerance
+ *      - Optimizer::useNumericalJacobian
+ *      - OptimizerSystem::constraintFunc
+ *      - OptimizerSystem::constraintJacobian
+ *      - OptimizerSystem::setNumEqualityConstraints
+ *      - OptimizerSystem::setNumInequalityConstraints
+ *      - OptimizerSystem::setNumLinearEqualityConstraints
+ *      - OptimizerSystem::setNumLinearInequalityConstraints
+ * - The effect of the diagnostics level is as follows:
+ *      - 0: minimal output to console (warnings, errors), some files are
+ *      written to the current directory (errcmaes.err error log).
+ *      - 1: additional output to console.
+ *      - 2: all files are written to the current directory.
+ *      - 3: output to console, and all files are written to the current directory.
+ *
+ *
+ * Encoding of Variables
+ *
+ * Inappropriate initialization of the algorithm may lead to resampling of the
+ * parameter distribution. Since some parameters may be defined in a bounded
+ * region [a, b]. The CMA algorithm involves sampling a random distribution for
+ * the variables (parameters) in the optimization problem. If the sampled values
+ * do not lie within the variables' bounds, CMA must resample the distribution
+ * until the variables lie within the bounds. This resampling is undesirable,
+ * and may prevent the algorithm from functioning properly. There are two ways
+ * to avoid excessive resampling:To overcome this the problem the user can
+ * formulate the problem as follows:
+ *
+ * 1) Either define the bounds of the parameter and choose the appropriate stddev
+ * and initial value for each parameter (see init_stepsize)
+ * 2) Or to reformulate the problem, by rescaling the parameter space so that
+ * each parameter map in a region between e.g. [0, 1] and each parameter has an
+ * initial value of 0.5 and stddev of 0.2 (see comments below).
+ *
+ * The specific formulation of a (real) optimization problem has a tremendous
+ * impact on the optimization performance. In particular, a reasonable parameter
+ * encoding is essential. All parameters should be rescaled such that they have
+ * presumably similar sensitivity (this makes the identity as initial covariance
+ * matrix the right choice). Usually, the best approach is to write a wrapper
+ * around the objective function that transforms the parameters before the actual
+ * function call. The wrapper scales, for example, in each parameter/coordinate
+ * the value [0; 10] into the typical actual domain of the parameter/coordinate.
+ *
+ * The natural encoding of (some of) the parameters can also be "logarithmic".
+ * That is, for a parameter that must always be positive, with a ratio between
+ * typical upper and lower value being larger than 100, we might use 10x instead
+ * of x to call the objective function. More specifically, to achieve the parameter
+ * range [10^–4,10^–1], we use 10^–4×10^3x/10 with x in [0; 10]. Again, the idea
+ * is to have similar sensitivity: this makes sense if we expect the change from
+ * 10^–4 to 10^–3 to have an impact similar to the change from 10^–2 to 10^–1.
+ * In order to avoid the problem that changes of very small values have too less
+ * an impact, an alternative is to choose 10^–1 × (x/10)2 >= 0. In the case where
+ * only a lower bound at zero is necessary, a simple and natural transformation is
+ * x2 × default_x, such that x=1 represents the default (or initial) value and x
+ * remains unbounded during optimization.
+ *
+ * In summary, to map the values [0;10] into [a;b] we have the alternative
+ * transformations a + (b-a) × x/10 or a + (b-a) × (x/10)2 >= a or a × (b/a)x/10 >= 0.
+ *
+ * For more details see: https://www.lri.fr/~hansen/cmaes_inmatlab.html
+ *
+ * Advanced options:
+ * 
+ * The default values for options whose name begins with "stop" are specified
+ * at https://github.com/CMA-ES/c-cmaes/blob/master/cmaes_initials.par
+ *
+ * - <b>popsize</b> (int; default: depends on number of parameters) The
+ *   population size (also known as lambda).
+ * - <b>init_stepsize</b> (Vector/Real; default: 0.3) Initial stddev; After the
+ *   encoding of variables, the initial solution point x0 and the initial standard
+ *   deviation (step_size) sigma0 must be chosen. In a practical application, one
+ *   often wants to start by trying to improve a given solution locally. In this
+ *   case we choose a rather small sigma0 (say in [0.001, 0.1], given the x-values
+ *   "live" in [0,10]). Thereby we can also check whether the initial solution is
+ *   possibly a local optimum. When a global optimum is sought-after on rugged or
+ *   multimodal landscapes, sigma0 should be chosen such that the final desirable
+ *   location (or at least some of its domain of attraction) is not far outside of
+ *   x0 ± 2sigma0 in each coordinate. (Remark that in Rn, if each boundary domain is
+ *   in distance sigma, then the boundary corner is sigma*sqrt(n) away, which poses
+ *   a slight dilemma for larger n.)
+ *
+ *   A warning is emitted if this is not set and default value is used for each
+ *   variable.
+ *
+ *   Example setting the init_stepsize:
+ *
+ *   Vector initStepSize(N, 0.3);
+ *   opt.setAdvancedVectorOption("init_stepsize", initStepSize);
+ *   "or"
+ *   opt.setAdvancedRealOption("init_stepsize", 0.3);
+ * - <b>seed</b> (int; default: 0, which uses clock time) Seed for the random
+ *   number generator that is used to sample the population from a normal
+ *   distribution. See note below.
+ * - <b>maxTimeFractionForEigendecomposition</b> (real; default: 0.2)
+ *   Controls the amount of time spent generating eigensystem
+ *   decompositions.
+ * - <b>stopMaxFunEvals</b> (int) Stop optimization after this
+ *   number of evaluations of the objective function.
+ * - <b>stopFitness</b> (real) Stop if function value is smaller than
+ *   stopFitness.
+ * - <b>stopTolFunHist</b> (real) Stop if function value differences of best
+ *   values are smaller than stopTolFunHist.
+ * - <b>stopTolX</b> (real) Stop if step sizes are smaller than stopTolX.
+ * - <b>stopTolUpXFactor</b> (real) Stop if standard deviation increases
+ *   by more than stopTolUpXFactor.
+ * - <b>parallel</b> (str) To run the optimization with multiple threads, set
+ *   this to "multithreading". Only use this if your OptimizerSystem is
+ *   threadsafe: you can't reliably modify any mutable variables in your
+ *   OptimizerSystem::objectiveFun().
+ * - <b>nthreads</b> (int) If the <b>parallel</b> option is set to
+ *   "multithreading", this is the number of threads to use (by default, this
+ *   is the number of processors/threads on the machine).
+ *
+ * If you want to generate identical results with repeated optimizations,
+ * you can set the <b>seed</b> option. In addition, you *must* set the
+ * <b>maxTimeFractionForEigendecomposition</b> option to be greater than or
+ * equal to 1.0.
+ *
+ * @code
+ * opt.setAdvancedIntOption("seed", 42);
+ * opt.setAdvancedRealOption("maxTimeFractionForEigendecomposition", 1);
+ * @endcode
+ *
  */
 class SimTK_SIMMATH_EXPORT Optimizer {
 public:
@@ -245,6 +425,8 @@ public:
     Optimizer( const OptimizerSystem& sys, OptimizerAlgorithm algorithm);
     ~Optimizer();
 
+    /// BestAvailable, UnknownAlgorithm, and UserSuppliedAlgorithm
+    /// are treated as never available.
     static bool isAlgorithmAvailable(OptimizerAlgorithm algorithm);
    
     /// Sets the relative accuracy used determine if the problem has converged.
@@ -255,12 +437,12 @@ public:
 
 
     /// Set the maximum number of iterations allowed of the optimization
-    /// method's outer / stepping loop. Most optimizers also have an inner loop
-    /// ("line search") which is / also iterative but is not affected by this
-    /// setting. Inner loop convergence is / typically prescribed by theory, and
-    /// failure there is often an indication of / an ill-formed problem.
+    /// method's outer stepping loop. Most optimizers also have an inner loop
+    /// ("line search") which is also iterative but is not affected by this
+    /// setting. Inner loop convergence is typically prescribed by theory, and
+    /// failure there is often an indication of an ill-formed problem.
     void setMaxIterations( int iter );
-    /// Set the maximum number of previous hessians used in a limitied memory
+    /// Set the maximum number of previous hessians used in a limited memory
     /// hessian approximation.
     void setLimitedMemoryHistory( int history );
     /// Set the level of debugging info displayed.
@@ -277,6 +459,8 @@ public:
     bool setAdvancedIntOption( const char *option, const int value );
     /// Set the value of an advanced option specified by an boolean value.
     bool setAdvancedBoolOption( const char *option, const bool value );
+    /// Set the value of an advanced option specified by an Vector value.
+    bool setAdvancedVectorOption( const char *option, const Vector value );
 
     
     /// Set which numerical differentiation algorithm is to be used for the next

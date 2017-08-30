@@ -49,6 +49,9 @@ public:
     virtual bool dependsOnlyOnPositions() const {
         return false;
     }
+    virtual bool shouldBeParallelIfPossible() const{
+        return false;
+    }
     ForceIndex getForceIndex() const {return index;}
     const GeneralForceSubsystem& getForceSubsystem() const 
     {   assert(forces); return *forces; }
@@ -106,15 +109,26 @@ private:
 //------------------------------------------------------------------------------
 class Force::TwoPointLinearSpringImpl : public ForceImpl {
 public:
-    TwoPointLinearSpringImpl(const MobilizedBody& body1, const Vec3& station1, const MobilizedBody& body2, const Vec3& station2, Real k, Real x0);
-    TwoPointLinearSpringImpl* clone() const {
+    TwoPointLinearSpringImpl(const MobilizedBody& body1, const Vec3& station1, 
+                             const MobilizedBody& body2, const Vec3& station2, 
+                             Real k, Real x0);
+
+    TwoPointLinearSpringImpl* clone() const override {
         return new TwoPointLinearSpringImpl(*this);
     }
-    bool dependsOnlyOnPositions() const {
+    bool dependsOnlyOnPositions() const override {
         return true;
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State&         state, 
+                   Vector_<SpatialVec>& bodyForces, 
+                   Vector_<Vec3>&       particleForces, 
+                   Vector&              mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
+
+    void calcDecorativeGeometryAndAppend(const State& s, Stage stage, 
+                                         Array_<DecorativeGeometry>& geom) 
+                                         const override;
+
 private:
     const SimbodyMatterSubsystem& matter;
     const MobilizedBodyIndex body1, body2;
@@ -130,11 +144,11 @@ private:
 class Force::TwoPointLinearDamperImpl : public ForceImpl {
 public:
     TwoPointLinearDamperImpl(const MobilizedBody& body1, const Vec3& station1, const MobilizedBody& body2, const Vec3& station2, Real damping);
-    TwoPointLinearDamperImpl* clone() const {
+    TwoPointLinearDamperImpl* clone() const override {
         return new TwoPointLinearDamperImpl(*this);
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
 private:
     const SimbodyMatterSubsystem& matter;
     const MobilizedBodyIndex body1, body2;
@@ -150,14 +164,14 @@ private:
 class Force::TwoPointConstantForceImpl : public ForceImpl {
 public:
     TwoPointConstantForceImpl(const MobilizedBody& body1, const Vec3& station1, const MobilizedBody& body2, const Vec3& station2, Real force);
-    TwoPointConstantForceImpl* clone() const {
+    TwoPointConstantForceImpl* clone() const override {
         return new TwoPointConstantForceImpl(*this);
     }
-    bool dependsOnlyOnPositions() const {
+    bool dependsOnlyOnPositions() const override {
         return true;
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
 private:
     const SimbodyMatterSubsystem& matter;
     const MobilizedBodyIndex body1, body2;
@@ -187,16 +201,16 @@ friend class MobilityLinearSpring;
            (getForceSubsystem().updDiscreteVariable(state, m_paramsIx));
     }
 
-    MobilityLinearSpringImpl* clone() const OVERRIDE_11
+    MobilityLinearSpringImpl* clone() const override
     {   return new MobilityLinearSpringImpl(*this); }
-    bool dependsOnlyOnPositions() const OVERRIDE_11 {return true;}
+    bool dependsOnlyOnPositions() const override {return true;}
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, 
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) const
-                   OVERRIDE_11;
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11;
+                   override;
+    Real calcPotentialEnergy(const State& state) const override;
 
     // Allocate the discrete state variable for the parameters. 
-    void realizeTopology(State& s) const OVERRIDE_11 {
+    void realizeTopology(State& s) const override {
         m_paramsIx = getForceSubsystem()
             .allocateDiscreteVariable(s, Stage::Dynamics, 
                  new Value< std::pair<Real,Real> >
@@ -237,16 +251,16 @@ friend class MobilityLinearDamper;
            (getForceSubsystem().updDiscreteVariable(state, m_dampingIx));
     }
 
-    MobilityLinearDamperImpl* clone() const OVERRIDE_11 
+    MobilityLinearDamperImpl* clone() const override 
     {   return new MobilityLinearDamperImpl(*this); }
 
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, 
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) const
-                   OVERRIDE_11;
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11;
+                   override;
+    Real calcPotentialEnergy(const State& state) const override;
 
     // Allocate the discrete state variable for the parameters. 
-    void realizeTopology(State& s) const OVERRIDE_11 {
+    void realizeTopology(State& s) const override {
         m_dampingIx = getForceSubsystem()
             .allocateDiscreteVariable(s, Stage::Dynamics, 
                  new Value<Real>(m_defaultDamping));
@@ -289,21 +303,21 @@ friend class MobilityConstantForce;
 
     // Implementation of virtual methods from ForceImpl:
 
-    MobilityConstantForceImpl* clone() const OVERRIDE_11 
+    MobilityConstantForceImpl* clone() const override 
     {   return new MobilityConstantForceImpl(*this); }
 
     // Has to wait for Dynamics stage because that's all that gets invalidated
     // if the constant force is changed.
-    bool dependsOnlyOnPositions() const OVERRIDE_11 {return false;}
+    bool dependsOnlyOnPositions() const override {return false;}
 
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, 
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) const
-                   OVERRIDE_11;
+                   override;
 
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11 {return 0;}
+    Real calcPotentialEnergy(const State& state) const override {return 0;}
 
     // Allocate the discrete state variable for the force. 
-    void realizeTopology(State& s) const OVERRIDE_11 {
+    void realizeTopology(State& s) const override {
         m_forceIx = getForceSubsystem()
             .allocateDiscreteVariable(s, Stage::Dynamics, 
                                       new Value<Real>(m_defaultForce));
@@ -336,7 +350,9 @@ friend class MobilityLinearStop;
         :   k(defStiffness), d(defDissipation), 
             qLow(defQLow), qHigh(defQHigh) {}
 
-        Real    k, d, qLow, qHigh;
+        Parameters() = default;
+
+        Real    k{NaN}, d{NaN}, qLow{NaN}, qHigh{NaN};
     };
 
     MobilityLinearStopImpl(const MobilizedBody&      mobod, 
@@ -347,19 +363,19 @@ friend class MobilityLinearStop;
                            Real                      defaultQHigh);
 
     // Implementation of virtual methods from ForceImpl:
-    MobilityLinearStopImpl* clone() const OVERRIDE_11 
+    MobilityLinearStopImpl* clone() const override 
     {   return new MobilityLinearStopImpl(*this); }
-    bool dependsOnlyOnPositions() const OVERRIDE_11 {return false;}
+    bool dependsOnlyOnPositions() const override {return false;}
 
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces,
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) const
-                   OVERRIDE_11; 
+                   override; 
 
     // We're not bothering to cache P.E. -- just recalculate it when asked.
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11; 
+    Real calcPotentialEnergy(const State& state) const override; 
 
     // Allocate the state variables and cache entry. 
-    void realizeTopology(State& s) const OVERRIDE_11 {
+    void realizeTopology(State& s) const override {
         // Allocate the discrete variable for dynamics parameters.
         const Parameters dv(m_defStiffness, m_defDissipation, 
                             m_defQLow, m_defQHigh);
@@ -414,20 +430,20 @@ public:
     void calcForce( const State&         state, 
                     Vector_<SpatialVec>& /*bodyForces*/, 
                     Vector_<Vec3>&       /*particleForces*/, 
-                    Vector&              mobilityForces) const OVERRIDE_11;
+                    Vector&              mobilityForces) const override;
 
     // This force element does not store potential energy.
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11 {return 0;}
+    Real calcPotentialEnergy(const State& state) const override {return 0;}
 
     // Allocate the needed state variable and record its index.
-    void realizeTopology(State& state) const OVERRIDE_11;
+    void realizeTopology(State& state) const override;
 
-    MobilityDiscreteForceImpl* clone() const OVERRIDE_11 
+    MobilityDiscreteForceImpl* clone() const override 
     {   return new MobilityDiscreteForceImpl(*this); }
 
     // Force this to wait for Dynamics stage before calculating, because that's
     // all that gets invalidated when a new forces is applied.
-    bool dependsOnlyOnPositions() const OVERRIDE_11 {return false;}
+    bool dependsOnlyOnPositions() const override {return false;}
 
 private:
 friend class Force::MobilityDiscreteForce;
@@ -464,20 +480,20 @@ public:
     void calcForce( const State&         state, 
                     Vector_<SpatialVec>& bodyForces, 
                     Vector_<Vec3>&       particleForces, 
-                    Vector&              mobilityForces) const OVERRIDE_11;
+                    Vector&              mobilityForces) const override;
 
     // This force element does not store potential energy.
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11 {return 0;}
+    Real calcPotentialEnergy(const State& state) const override {return 0;}
 
     // Allocate the needed state variable and record its index.
-    void realizeTopology(State& state) const OVERRIDE_11;
+    void realizeTopology(State& state) const override;
 
-    DiscreteForcesImpl* clone() const OVERRIDE_11 
+    DiscreteForcesImpl* clone() const override 
     {   return new DiscreteForcesImpl(*this); }
 
     // Force this to wait for Dynamics stage before calculating, because that's
     // all that gets invalidated when a new forces is applied.
-    bool dependsOnlyOnPositions() const OVERRIDE_11 {return false;}
+    bool dependsOnlyOnPositions() const override {return false;}
 
 private:
 friend class Force::DiscreteForces;
@@ -496,14 +512,14 @@ friend class Force::DiscreteForces;
 class Force::ConstantForceImpl : public ForceImpl {
 public:
     ConstantForceImpl(const MobilizedBody& body, const Vec3& station, const Vec3& force);
-    ConstantForceImpl* clone() const {
+    ConstantForceImpl* clone() const override {
         return new ConstantForceImpl(*this);
     }
-    bool dependsOnlyOnPositions() const {
+    bool dependsOnlyOnPositions() const override {
         return true;
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
 private:
     const SimbodyMatterSubsystem& matter;
     const MobilizedBodyIndex body;
@@ -518,14 +534,14 @@ private:
 class Force::ConstantTorqueImpl : public ForceImpl {
 public:
     ConstantTorqueImpl(const MobilizedBody& body, const Vec3& torque);
-    ConstantTorqueImpl* clone() const {
+    ConstantTorqueImpl* clone() const override {
         return new ConstantTorqueImpl(*this);
     }
-    bool dependsOnlyOnPositions() const {
+    bool dependsOnlyOnPositions() const override {
         return true;
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
 private:
     const SimbodyMatterSubsystem& matter;
     const MobilizedBodyIndex body;
@@ -540,11 +556,11 @@ private:
 class Force::GlobalDamperImpl : public ForceImpl {
 public:
     GlobalDamperImpl(const SimbodyMatterSubsystem& matter, Real damping);
-    GlobalDamperImpl* clone() const {
+    GlobalDamperImpl* clone() const override {
         return new GlobalDamperImpl(*this);
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
 private:
     const SimbodyMatterSubsystem& matter;
     Real damping;
@@ -558,11 +574,11 @@ private:
 class Force::UniformGravityImpl : public ForceImpl {
 public:
     UniformGravityImpl(const SimbodyMatterSubsystem& matter, const Vec3& g, Real zeroHeight);
-    UniformGravityImpl* clone() const {
+    UniformGravityImpl* clone() const override {
         return new UniformGravityImpl(*this);
     }
-    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const;
-    Real calcPotentialEnergy(const State& state) const;
+    void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, Vector_<Vec3>& particleForces, Vector& mobilityForces) const override;
+    Real calcPotentialEnergy(const State& state) const override;
     Vec3 getGravity() const {
         return g;
     }
@@ -591,16 +607,19 @@ private:
 class Force::CustomImpl : public ForceImpl {
 public:
     CustomImpl(Force::Custom::Implementation* implementation);
-    CustomImpl* clone() const {
+    CustomImpl* clone() const override {
         return new CustomImpl(*this);
     }
-    bool dependsOnlyOnPositions() const {
+    bool dependsOnlyOnPositions() const override {
         return implementation->dependsOnlyOnPositions();
     }
     void calcForce(const State& state, Vector_<SpatialVec>& bodyForces, 
                    Vector_<Vec3>& particleForces, Vector& mobilityForces) 
-                   const OVERRIDE_11;
-    Real calcPotentialEnergy(const State& state) const OVERRIDE_11;
+                   const override;
+    Real calcPotentialEnergy(const State& state) const override;
+    bool shouldBeParallelIfPossible() const override {
+        return implementation->shouldBeParallelIfPossible();
+    }
     ~CustomImpl() {
         delete implementation;
     }
@@ -611,35 +630,35 @@ public:
         return *implementation;
     }
 protected:
-    void realizeTopology(State& state) const OVERRIDE_11 {
+    void realizeTopology(State& state) const override {
         implementation->realizeTopology(state);
     }
-    void realizeModel(State& state) const OVERRIDE_11 {
+    void realizeModel(State& state) const override {
         implementation->realizeModel(state);
     }
-    void realizeInstance(const State& state) const OVERRIDE_11 {
+    void realizeInstance(const State& state) const override {
         implementation->realizeInstance(state);
     }
-    void realizeTime(const State& state) const OVERRIDE_11 {
+    void realizeTime(const State& state) const override {
         implementation->realizeTime(state);
     }
-    void realizePosition(const State& state) const OVERRIDE_11 {
+    void realizePosition(const State& state) const override {
         implementation->realizePosition(state);
     }
-    void realizeVelocity(const State& state) const OVERRIDE_11 {
+    void realizeVelocity(const State& state) const override {
         implementation->realizeVelocity(state);
     }
-    void realizeDynamics(const State& state) const OVERRIDE_11 {
+    void realizeDynamics(const State& state) const override {
         implementation->realizeDynamics(state);
     }
-    void realizeAcceleration(const State& state) const OVERRIDE_11 {
+    void realizeAcceleration(const State& state) const override {
         implementation->realizeAcceleration(state);
     }
-    void realizeReport(const State& state) const OVERRIDE_11 {
+    void realizeReport(const State& state) const override {
         implementation->realizeReport(state);
     }
     void calcDecorativeGeometryAndAppend(const State& state, Stage stage, 
-        Array_<DecorativeGeometry>& geom) const OVERRIDE_11 
+        Array_<DecorativeGeometry>& geom) const override 
     {
         implementation->calcDecorativeGeometryAndAppend(state,stage,geom);
     }

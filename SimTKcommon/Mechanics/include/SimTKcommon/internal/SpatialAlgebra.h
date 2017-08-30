@@ -227,7 +227,7 @@ frame F, with the result returned in A.
 
 Given the spatial acceleration A_FA of frame A in a reference frame F, and
 the spatial acceleration A_FB of frame B in F, and corresonding pose and
-velcoity information, calculate the relative acceleration A_AB of frame B in 
+velocity information, calculate the relative acceleration A_AB of frame B in 
 frame A, measured and expressed in A. Typical usage:
 @code
     Transform  X_GA, X_GB;      // assume these are known from somewhere
@@ -288,7 +288,7 @@ Example:
     SpatialVec A_GA, A_GB;
 
     const Vec3 p_AB_G = X_GB.p() - X_GA.p();
-    SpatialVec V_AB_G = findRelativeAccelerationInF(p_AB_G, V_GA, A_GA,
+    SpatialVec A_AB_G = findRelativeAccelerationInF(p_AB_G, V_GA, A_GA,
                                                             V_GB, A_GB);
 @endcode
 Cost is 72 flops. @see findRelativeAcceleration() **/
@@ -687,7 +687,7 @@ public:
     typedef PhiMatrixTranspose TransposeType;
 
     PhiMatrix() { setToNaN(); }
-    PhiMatrix(const Vec3& l) : l_(l) {}
+    explicit PhiMatrix(const Vec3& l) : l_(l) {}
 
     void setToZero() { l_ = 0; }
     void setToNaN()  { l_.setToNaN(); }
@@ -704,7 +704,7 @@ private:
 
 class PhiMatrixTranspose {
 public:
-    PhiMatrixTranspose(const PhiMatrix& phi) : phi(phi) {}
+    explicit PhiMatrixTranspose(const PhiMatrix& phi) : phi(phi) {}
 
     SpatialMat toSpatialMat() const {
         return SpatialMat(   Mat33(1)    , Mat33(0),
@@ -743,6 +743,15 @@ operator*(const PhiMatrix&  phi,
                            m(1,0)       ,     m(1,1));
 }
 
+inline SpatialMat
+operator*(const SpatialMat& m,
+          const PhiMatrix&  phi)
+{
+    const Mat33 x = crossMat(phi.l());  // 3 flops
+    return SpatialMat( m(0,0),    m(0,0)*x + m(0,1),   // 54 flops
+                       m(1,0),    m(1,0)*x + m(1,1) ); // 54 flops
+}
+
 inline SpatialVec
 operator*(const PhiMatrixTranspose& phiT,
           const SpatialVec&         v)
@@ -751,6 +760,14 @@ operator*(const PhiMatrixTranspose& phiT,
                       v[1] + v[0] % phiT.l());  // 12 flops
 }
 
+inline SpatialMat
+operator*(const PhiMatrixTranspose& phiT,
+          const SpatialMat&         m)
+{
+    const Mat33 x = crossMat(phiT.l());  // 3 flops
+    return SpatialMat(    m(0,0)     ,     m(0,1),      
+                      m(1,0)-x*m(0,0), m(1,1)-x*m(0,1)); // 108 flops
+}
 
 inline SpatialMat
 operator*(const SpatialMat::THerm&  m,
